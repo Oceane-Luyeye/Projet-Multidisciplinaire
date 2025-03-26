@@ -16,6 +16,8 @@ pip install -r requirements.txt
 Lancer le projet : 
 ```bash 
 make
+
+./voyageur
 ```
 
 Nettoyer le projet
