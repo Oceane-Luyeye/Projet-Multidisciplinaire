@@ -16,7 +16,7 @@ Voici un exemple d'implémentation d'un algorithme génétique pour résoudre le
 // Structure pour représenter une ville
 typedef struct {
     int x;
-    int y;
+    int y; /* Les x et y seront les cordonnées géométrique des villes de livraisons*/
 } Ville;
 
 // Structure pour représenter un individu (chemin)
@@ -103,3 +103,70 @@ void mutation(Individu enfants[POPULATION / 2]) {
         }
     }
 }
+
+// Fonction pour remplacer la population par les enfants
+void replacement(Individu population[POPULATION], Individu enfants[POPULATION / 2]) {
+    int i;
+    for (i = 0; i < POPULATION / 2; i++) {
+        population[i] = enfants[i];
+    }
+}
+
+// Fonction pour afficher la population
+void afficherPopulation(Individu population[POPULATION]) {
+    int i, j;
+    for (i = 0; i < POPULATION; i++) {
+        printf("Individu %d : ", i);
+        for (j = 0; j < N; j++) {
+            printf("%d ", population[i].genes[j]);
+        }
+        printf("\n");
+    }
+}
+
+int main() {
+    // Initialisation des villes
+    Ville villes[N];
+    int i;
+    for (i = 0; i < N; i++) {
+        villes[i].x = rand() % 100;
+        villes[i].y = rand() % 100;
+    }
+
+    // Initialisation de la population
+    Individu population[POPULATION];
+    generatePopulation(population);
+
+    // Évaluation de la population
+    for (i = 0; i < POPULATION; i++) {
+        calculateFitness(population[i], villes);
+    }
+
+    // Boucle principale
+    for (i = 0; i < ITERATIONS; i++) {
+        // Sélection des parents
+        Individu parents[POPULATION / 2];
+        selection(population, parents);
+
+        // Croisement
+        Individu enfants[POPULATION / 2];
+        crossover(parents, enfants);
+
+        // Mutation
+        mutation(enfants);
+
+        // Remplacement de la population
+        replacement(population, enfants);
+
+        // Évaluation de la population
+        for (int j = 0; j < POPULATION; j++) {
+            calculateFitness(population[j], villes);
+        }
+    }
+
+    // Affichage de la population finale
+    afficherPopulation(population);
+
+    return 0;
+}
+

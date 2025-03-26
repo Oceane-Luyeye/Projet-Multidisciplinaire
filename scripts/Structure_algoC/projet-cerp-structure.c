@@ -27,22 +27,20 @@ typedef struct {
     int duree_totale;      // en secondes
 } Tournee;
 
-// Structure pour représenter une solution complète
+// Structure pour représenter une Individu complète
 typedef struct {
     Tournee* tournees;
     int nombre_tournees;
     double distance_totale;
     double cout_carburant;
-} Solution;
-
-
+} Individu;
 
 // Fonctions principales du programme
 int lire_csv(const char* fichier, Pharmacie** pharmacies);
 int geocoder_pharmacies(Pharmacie* pharmacies, int nombre);
 double calculer_distance(double lat1, double lon1, double lat2, double lon2);
-Solution* optimiser_tournees(Pharmacie* pharmacies, int nombre_pharmacies, double lat_depot, double lon_depot);
-void generer_pdf(Solution* solution, const char* chemin_sortie);
+Individu* optimiser_tournees(Pharmacie* pharmacies, int nombre_pharmacies, double lat_depot, double lon_depot);
+void generer_pdf(Individu* Individu, const char* chemin_sortie);
 
 // Programme principal
 int main(int argc, char** argv) {
@@ -71,15 +69,15 @@ int main(int argc, char** argv) {
     }
     
     // Optimiser les tournées
-    Solution* solution = optimiser_tournees(pharmacies, nombre_pharmacies, LAT_DEPOT, LON_DEPOT);
+    Individu* Individu = optimiser_tournees(pharmacies, nombre_pharmacies, LAT_DEPOT, LON_DEPOT);
     
-    if (solution == NULL) {
+    if (Individu == NULL) {
         printf("Erreur lors de l'optimisation des tournées\n");
         return 1;
     }
     
     // Générer les PDF
-    generer_pdf(solution, argv[2]);
+    generer_pdf(Individu, argv[2]);
     
     // Libération de la mémoire
     // TODO: Libérer la mémoire allouée
