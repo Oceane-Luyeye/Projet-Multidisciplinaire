@@ -10,3 +10,15 @@ Test
 # Pour installer les librairies dans l'environnement pyhton : 
 pip install -r requirements.txt
 ```
+
+# Anaïs | Update Mercredi 26 Mars : Matrice
+
+Lancer le projet : 
+```bash 
+make
+```
+
+Nettoyer le projet
+```bash
+make clean
+```
