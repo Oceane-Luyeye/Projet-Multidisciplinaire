@@ -5,15 +5,12 @@
 #define SIZE 10
 
 int main(int argc, char** argv) {
-    float** matrix = initMatrix(SIZE);
+    MoveMatrix* moveMat = initMovementMatrix(SIZE);
 
+    readFile("data/depot_with_id/livraison30_matrix_and_time_with_ids.csv", moveMat);
+    printMatrix(moveMat);
 
+    freeMoveMat(moveMat);
 
-    readFile("./data/preprocessing/distances/livraison10_matrix.csv", matrix);
-    printMatrix(matrix, SIZE);
-
-    
-
-
-    
+    return 0;
 }
