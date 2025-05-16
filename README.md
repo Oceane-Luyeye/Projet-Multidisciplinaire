@@ -24,3 +24,7 @@ Nettoyer le projet
 ```bash
 make clean
 ```
+
+
+# Daouda | Add genetic_python/genetic2.py
+Dossier **display_map** contient le fichier HTML pour l'affichage sur la carte graphique.
