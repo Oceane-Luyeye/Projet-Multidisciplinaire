@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Affichage de voyageur de commence</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <style>
+        #map { width: 100%; height: 600px; margin-top: 20px; }
+    </style>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script>
+        "use strict";
+
+        function csvToJson(csvText, delimiter = ',') {
+            const lines = csvText.trim().split('\n');
+            const headers = lines[0].split(delimiter).map(h => h.trim());
+            const jsonData = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const row = lines[i].split(delimiter);
+                const obj = {};
+                headers.forEach((header, index) => {
+                    obj[header] = row[index]?.trim();
+                });
+                jsonData.push(obj);
+            }
+
+            return jsonData;
+        }
+
+        function addMarkersToMap(data, map) {
+            data.forEach(item => {
+                const lat = parseFloat(item.latitude);
+                const lon = parseFloat(item.longitude);
+                const id = item.pharmacy_id;
+
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    L.marker([lat, lon])
+                        .addTo(map)
+                        .bindPopup(`<b>Pharmacy ID:</b> ${id}<br><b>Lat:</b> ${lat}<br><b>Lon:</b> ${lon}`);
+                }
+            });
+        }
+
+        window.onload = () => {
+            const map = L.map('map').setView([48.8566, 2.3522], 9); // Vue générale Île-de-France
+
+            L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 18,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            document.getElementById('csvInput').addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const csv = e.target.result;
+                    const json = csvToJson(csv);
+                    console.log(json); // debug
+                    addMarkersToMap(json, map);
+                };
+                reader.readAsText(file);
+            });
+        };
+    </script>
+</head>
+<body>
+    <h1>VOYAGEUR DE COMMERCE </h1>
+    <input type="file" id="csvInput" accept=".csv">
+    <div id="map"></div>
+</body>
+</html>
