@@ -4,26 +4,6 @@
 
 #include "../include/processFile.h"
 
-MoveMatrix* initMovementMatrix(int capacity) {
-    MoveMatrix* moveMat = malloc(sizeof(MoveMatrix));
-    if (!moveMat) return NULL;
-
-    moveMat->size = 0;
-    moveMat->capacity = capacity;
-    moveMat->matrix = malloc(capacity*sizeof(Move*));
-    if (!moveMat->matrix) {
-        free(moveMat);
-        return NULL;
-    }
-
-    if(initMatrix(moveMat, capacity) == 0) {
-        free(moveMat);
-        return NULL;
-    }
-
-    return moveMat;
-}
-
 
 int initMatrix(MoveMatrix* moveMat, int capacity) {
     if (!moveMat) return 0;
@@ -47,6 +27,26 @@ int initMatrix(MoveMatrix* moveMat, int capacity) {
 
     moveMat->size = capacity;
     return 1;
+}
+
+MoveMatrix* initMovementMatrix(int capacity) {
+    MoveMatrix* moveMat = malloc(sizeof(MoveMatrix));
+    if (!moveMat) return NULL;
+
+    moveMat->size = 0;
+    moveMat->capacity = capacity;
+    moveMat->matrix = malloc(capacity*sizeof(Move*));
+    if (!moveMat->matrix) {
+        free(moveMat);
+        return NULL;
+    }
+
+    if(initMatrix(moveMat, capacity) == 0) {
+        free(moveMat);
+        return NULL;
+    }
+
+    return moveMat;
 }
 
 
@@ -145,7 +145,7 @@ void readFile(char* filename, MoveMatrix* moveMat) {
 
         int maxIndex = d > a ? d : a;
         if (maxIndex >= moveMat->capacity) {
-            if (resizeMoveMatrix(moveMat, maxIndex + 5) != 1) {
+            if (resizeMoveMatrix(moveMat, maxIndex + SIZE) != 1) {
                 fprintf(stderr, "error readfile -> resizeMoveMatrix\n");
                 fclose(f);
                 return;

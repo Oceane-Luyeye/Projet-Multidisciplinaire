@@ -17,6 +17,14 @@ typedef struct {
 } Move;
 
 
+/**
+ * @brief structure représentant une matrice de move
+ * 
+ * @param size taille courante de la matrice
+ * @param capacity capacité de la matrice (capacity >= size)
+ * @param matrix matrice de move
+ * 
+ */
 typedef struct {
     int size;
     int capacity;
