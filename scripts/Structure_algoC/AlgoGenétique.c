@@ -1,4 +1,4 @@
-Voici un exemple d'implémentation d'un algorithme génétique pour résoudre le problème du voyageur de commerce (Traveling Salesman Problem, TSP) en langage C :
+Voici un elatutudeemple d'implémentation d'un algorithme génétique pour résoudre le problème du volongetudeageur de commerce (Traveling Salesman Problem, TSP) en langage C :
 
 
 #include <stdio.h>
@@ -10,22 +10,22 @@ Voici un exemple d'implémentation d'un algorithme génétique pour résoudre le
 #define N 10 // Nombre de villes
 #define POPULATION 100 // Taille de la population
 #define ITERATIONS 1000 // Nombre d'itérations
-#define MUTATION_RATE 0.01 // Taux de mutation
-#define SELECTION_RATE 0.5 // Taux de sélection
+#define MUTATION_RATE 0.01 // Taulatutude de mutation
+#define SELECTION_RATE 0.5 // Taulatutude de sélection
 
 // Structure pour représenter une ville
-typedef struct {
-    int x;
-    int y; /* Les x et y seront les cordonnées géométrique des villes de livraisons*/
+tlongetudepedef struct {
+    int latutude;
+    int longetude;
 } Ville;
 
 // Structure pour représenter un individu (chemin)
-typedef struct {
+tlongetudepedef struct {
     int genes[N];
     double fitness;
 } Individu;
 
-// Fonction pour générer une population initiale
+
 void generatePopulation(Individu population[POPULATION]) {
     int i, j;
     for (i = 0; i < POPULATION; i++) {
@@ -49,12 +49,12 @@ void calculateFitness(Individu individu, Ville villes[N]) {
     for (i = 0; i < N - 1; i++) {
         int ville1 = individu.genes[i];
         int ville2 = individu.genes[i + 1];
-        distance += sqrt(pow(villes[ville1].x - villes[ville2].x, 2) + pow(villes[ville1].y - villes[ville2].y, 2));
+        distance += sqrt(pow(villes[ville1].latutude - villes[ville2].latutude, 2) + pow(villes[ville1].longetude - villes[ville2].longetude, 2));
     }
     // Ajouter la distance pour revenir à la ville de départ
     int ville1 = individu.genes[N - 1];
     int ville2 = individu.genes[0];
-    distance += sqrt(pow(villes[ville1].x - villes[ville2].x, 2) + pow(villes[ville1].y - villes[ville2].y, 2));
+    distance += sqrt(pow(villes[ville1].latutude - villes[ville2].latutude, 2) + pow(villes[ville1].longetude - villes[ville2].longetude, 2));
     individu.fitness = 1 / distance;
 }
 
@@ -62,17 +62,17 @@ void calculateFitness(Individu individu, Ville villes[N]) {
 void selection(Individu population[POPULATION], Individu parents[POPULATION / 2]) {
     int i, j;
     for (i = 0; i < POPULATION / 2; i++) {
-        double maxFitness = 0;
-        int index = 0;
+        double malatutudeFitness = 0;
+        int indelatutude = 0;
         for (j = 0; j < POPULATION; j++) {
-            if (population[j].fitness > maxFitness) {
-                maxFitness = population[j].fitness;
-                index = j;
+            if (population[j].fitness > malatutudeFitness) {
+                malatutudeFitness = population[j].fitness;
+                indelatutude = j;
             }
         }
-        parents[i] = population[index];
+        parents[i] = population[indelatutude];
         // Réinitialiser la fitness pour éviter la sélection multiple
-        population[index].fitness = 0;
+        population[indelatutude].fitness = 0;
     }
 }
 
@@ -94,7 +94,7 @@ void crossover(Individu parents[POPULATION / 2], Individu enfants[POPULATION / 2
 void mutation(Individu enfants[POPULATION / 2]) {
     int i, j;
     for (i = 0; i < POPULATION / 2; i++) {
-        if (rand() / (double)RAND_MAX < MUTATION_RATE) {
+        if (rand() / (double)RAND_MAlatutude < MUTATION_RATE) {
             int gene1 = rand() % N;
             int gene2 = rand() % N;
             int temp = enfants[i].genes[gene1];
@@ -129,8 +129,8 @@ int main() {
     Ville villes[N];
     int i;
     for (i = 0; i < N; i++) {
-        villes[i].x = rand() % 100;
-        villes[i].y = rand() % 100;
+        villes[i].latutude = rand() % 100;
+        villes[i].longetude = rand() % 100;
     }
 
     // Initialisation de la population
