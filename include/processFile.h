@@ -1,8 +1,13 @@
 #ifndef PROCESSFILE_H
 #define PROCESSFILE_H
 
-void readFile(char* file, float** matrix);
-void printMatrix(float** matrix, int size);
-float** initMatrix(int size);
+#include "./Move.h"
+
+int initMatrix(MoveMatrix* moveMat, int capacity);
+MoveMatrix* initMovementMatrix(int capacity);
+void freeMoveMat(MoveMatrix* moveMat);
+void readFile(char* filename, MoveMatrix* moveMat);
+int resizeMoveMatrix(MoveMatrix* moveMat, int newCapacity);
+void printMatrix(MoveMatrix* moveMat);
 
 #endif
