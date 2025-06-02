@@ -26,5 +26,8 @@ make clean
 ```
 
 
-# Daouda | Add genetic_python/genetic2.py
-Dossier **display_map** contient le fichier HTML pour l'affichage sur la carte graphique.
+# Daouda | Add Script_map.py
+Dossier **display_map** contient le script python pour afficher les point sur une carte graphique
+Install la bibliothèque avec **pip install pandas geopandas matplotlib contextily**
+J'ai commenté tout le code pour faciler la comprehension.
+Le fichier pdf est généré dans le dossier *scripts/pdf* 
