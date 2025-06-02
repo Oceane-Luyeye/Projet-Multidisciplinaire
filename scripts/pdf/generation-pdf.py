@@ -1,5 +1,19 @@
 from fpdf import FPDF
 
+import subprocess
+import requests
+import time
+
+process = subprocess.Popen(["python3", "app.py"])
+
+time.sleep(2)
+
+r = requests.get("http://127.0.0.1:5000/generate")
+
+print(r)
+
+process.terminate()
+
 # Création d'une instance de FPDF
 pdf = FPDF()
 
