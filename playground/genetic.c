@@ -17,7 +17,7 @@
 #include <time.h>
 
 /* Hyperparameters */
-#define POP_SIZE 1000
+#define POP_SIZE 300
 #define GENERATIONS 10000
 #define MUTATION_RATE 0.075
 #define ELITE_FRAC 0.45
@@ -429,7 +429,7 @@ int main(int argc, char **argv)
     {
         /* Fallback to heuristic based on number of points */
         min_t = n_points / 10;
-        max_t = n_points / 5;
+        max_t = n_points / 4;
         if (min_t < 1)
             min_t = 1;
         if (max_t < min_t)
@@ -458,28 +458,45 @@ int main(int argc, char **argv)
         }
     }
 
-    /* Print best overall solution to stdout */
-    printf("Best %d trucks: routes=[", gk);
+    printf("Best %d trucks:\n", gk);
+    int nc = n_points - 1;
+    int size = (nc + gk - 1) / gk;
+
+    double total_time_all = 0.0;
+    double total_dist_all = 0.0;
+
+    for (int t = 0; t < gk; ++t)
     {
-        int nc = n_points - 1;
-        int size = (nc + gk - 1) / gk;
-        for (int t = 0; t < gk; ++t)
+        int start = t * size;
+        int end = start + size;
+        if (start >= nc)
+            break;
+        if (end > nc)
+            end = nc;
+
+        double route_dist = 0.0;
+        double route_time = 0.0;
+        int prev = 0;
+
+        printf("Truck %d: 0", t + 1);
+        for (int i = start; i < end; ++i)
         {
-            int start = t * size;
-            int end = start + size;
-            if (end > nc)
-                end = nc;
-            printf("[0");
-            for (int i = start; i < end; ++i)
-            {
-                printf(", %d", global.perm[i]);
-            }
-            printf(", 0]");
-            if (t < gk - 1)
-                printf(", ");
+            int c = global.perm[i];
+            route_dist += dist_mat[IDX(prev, c)];
+            route_time += time_mat[IDX(prev, c)] + STOP_TIME;
+            prev = c;
+            printf(" -> %d", c);
         }
+        route_dist += dist_mat[IDX(prev, 0)];
+        route_time += time_mat[IDX(prev, 0)];
+        printf(" -> 0\n");
+
+        printf("    Time: %.2f min | Distance: %.2f km\n", route_time, route_dist);
+
+        total_time_all += route_time;
+        total_dist_all += route_dist;
     }
-    printf("] dist=%.2f\n", global.fitness);
+    printf("TOTAL: Time = %.2f min | Distance = %.2f km\n", total_time_all, total_dist_all);
 
     /* Write only the detailed routes + metrics into output.txt */
     {
@@ -500,6 +517,8 @@ int main(int argc, char **argv)
                 int route_idx = t + 1;
                 int start = t * size;
                 int end = start + size;
+                if (start >= nc)
+                    break;
                 if (end > nc)
                     end = nc;
 
