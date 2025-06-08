@@ -2,6 +2,11 @@ import csv
 from datetime import datetime, timedelta
 import pprint
 import subprocess
+import pandas as pd
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import contextily as ctx
+import os
 
 """
 Lit un fichier CSV de matrice distance/temps et crée deux matrices (distances et durées)
@@ -52,11 +57,13 @@ def parse_routes_from_text(text):
     lines = text.strip().split('\n')
 
     for line in lines:
-        chemin = line.split('|')[0]
-        parts = chemin.split(':', 1)
-        _, route_str = parts
-        ids = [int(x.strip()) for x in route_str.strip().split('->')]
-        routes.append(ids)
+        if line.strip():  # Éviter les lignes vides
+            chemin = line.split('|')[0]
+            parts = chemin.split(':', 1)
+            if len(parts) == 2:
+                _, route_str = parts
+                ids = [int(x.strip()) for x in route_str.strip().split('->')]
+                routes.append(ids)
     return routes
 
 """
@@ -68,13 +75,13 @@ Construit un objet JSON détaillant les trajets, durées, distances et coûts à
     - dict : objet avec informations sur chaque camion (trajet, durée, distance, coût carburant)
 """
 def createJsonObject(file_matrix_csv, tab):
-    in_matin = 1
-    in_aprem = 0
-
     matrix_dist, matrix_time = getMatrix(file_matrix_csv)
     result = {}
 
     for i, item in enumerate(tab):
+        in_matin = 1
+        in_aprem = 0
+        
         trajet_dict = {}
         distance_totale = 0
         duree_totale = 0
@@ -89,10 +96,13 @@ def createJsonObject(file_matrix_csv, tab):
             depart = item[j]
             arrivee = item[j + 1]
             duree = matrix_time[depart][arrivee]
+            distance = matrix_dist[depart][arrivee]
 
+            # Temps d'arrêt de 3 minutes pour les livraisons (sauf premier trajet)
             if j > 0:
                 current_time += timedelta(minutes=3)
 
+            # Gestion de la pause déjeuner
             if (in_matin and (current_time + timedelta(minutes=duree) > fin_matin or duree_tournee + duree > 180)):
                 current_time = debut_aprem
                 duree_tournee = 0
@@ -112,7 +122,7 @@ def createJsonObject(file_matrix_csv, tab):
             trajet_dict[f'etape{j + 1}'] = etape
             current_time = heure_arrivee
             duree_tournee += duree
-            distance_totale += matrix_dist[depart][arrivee]
+            distance_totale += distance
             duree_totale += duree
 
         result[f'camion{i + 1}'] = {
@@ -133,15 +143,22 @@ Compile et exécute un programme externe 'genetic' (via make), avec les paramèt
 """
 def execute(file_matrix_csv, min_truck, max_truck):
     try:
-        compile = subprocess.run(["make"], capture_output=True, text=True)
-        if compile.returncode != 0:
-            return "execute() error :" + compile.stderr
+        compile_result = subprocess.run(["make"], capture_output=True, text=True)
+        if compile_result.returncode != 0:
+            print("Erreur de compilation :", compile_result.stderr)
+            return "execute() error :" + compile_result.stderr
 
         result = subprocess.run(["./genetic", file_matrix_csv, str(min_truck), str(max_truck)], capture_output=True, text=True)
         if result.returncode != 0:
+            print("Erreur d'exécution :", result.stderr)
             return "execute() error : " + result.stderr
+        
+        print("Exécution réussie du programme genetic")
+        return result.stdout
+        
     except Exception as e:
-        return "error : " + e
+        print("Exception lors de l'exécution :", str(e))
+        return "error : " + str(e)
 
 
 """
@@ -150,16 +167,127 @@ Lit le fichier output_file, parse les routes, et crée un objet JSON des trajets
         file_matrix_csv (str): chemin vers la matrice CSV.
         output_file (str): fichier texte avec les routes générées.
     Returns:
-        dict: données des trajets ou dict d’erreur si problème.
+        dict: données des trajets ou dict d'erreur si problème.
     Note:
-        Ne lance pas l’exécution du programme externe, output_file doit exister.
+        Ne lance pas l'exécution du programme externe, output_file doit exister.
 """
 def generate_routes_from_file(file_matrix_csv, output_file): 
     try:
         with open(output_file, 'r', encoding='utf-8') as f:
             text = f.read()
+        
+        print("Contenu du fichier output.txt :")
+        print(text)
+        print("=" * 50)
+        
         tab = parse_routes_from_text(text)
-        return createJsonObject(file_matrix_csv, tab)
+        print("Routes parsées :", tab)
+        
+        result = createJsonObject(file_matrix_csv, tab)
+        print("Objet JSON créé :")
+        pprint.pprint(result)
+        
+        return result
+        
     except Exception as e:
-        return "generate_routes_from_file() error : " + e
- 
+        print("Erreur dans generate_routes_from_file :", str(e))
+        return {"error": "generate_routes_from_file() error : " + str(e)}
+
+
+def create_route_map(routes_data, coords_csv_path, output_image_path):
+    """
+    Crée une carte des trajets et la sauvegarde en image
+    
+    Parameters:
+        routes_data (dict): Données des routes générées par pdf_data_builder
+        coords_csv_path (str): Chemin vers le fichier CSV des coordonnées
+        output_image_path (str): Chemin de sortie pour l'image de la carte
+    """
+    try:
+        df_coords = pd.read_csv(coords_csv_path)
+        
+        routes = []
+        for camion_key, camion_data in routes_data.items():
+            route = []
+            trajet = camion_data['trajet']
+            
+            if trajet:
+                first_etape = list(trajet.values())[0]
+                route.append(first_etape['pharmacie_depart_id'])
+                
+                for etape_data in trajet.values():
+                    route.append(etape_data['pharmacie_arrivee_id'])
+            
+            if route:
+                routes.append(route)
+        
+        if not routes:
+            print("Aucune route trouvée pour créer la carte")
+            return False
+        
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        custom_colors = [
+            "red", "green", "blue", "orange", "purple", "cyan",
+            "#FF00FF", "#00FFFF", "#FFD700", "#8B0000", "#7FFF00",
+            "#FF69B4", "#00BFFF", "#DAA520", "#556B2F", "#A52A2A",
+            "#800080", "#2E8B57", "#B22222", "#5F9EA0"
+        ]
+        
+        all_points = []
+        
+        for i, route in enumerate(routes):
+            try:
+                valid_indices = [idx for idx in route if idx < len(df_coords)]
+                
+                if not valid_indices:
+                    continue
+                    
+                sous_df = df_coords.iloc[valid_indices]
+                
+                gdf = gpd.GeoDataFrame(
+                    geometry=gpd.points_from_xy(sous_df["longitude"], sous_df["latitude"]),
+                    crs="EPSG:4326"
+                ).to_crs(epsg=3857)
+                
+                color = custom_colors[i % len(custom_colors)]
+                ax.plot(gdf.geometry.x, gdf.geometry.y, 
+                       marker='o', linestyle='-', linewidth=2, markersize=6,
+                       color=color, label=f"Camion {i+1}")
+                
+                for x, y, idx in zip(gdf.geometry.x, gdf.geometry.y, valid_indices):
+                    ax.text(x, y + 50, str(idx), fontsize=8, ha='center', 
+                           bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.7))
+                
+                all_points.extend(gdf.geometry)
+                
+            except Exception as e:
+                print(f"Erreur lors du traçage de la route {i+1}: {e}")
+                continue
+        
+        if not all_points:
+            print("Aucun point valide trouvé pour créer la carte")
+            return False
+        
+        all_x = [pt.x for pt in all_points]
+        all_y = [pt.y for pt in all_points]
+        margin_x = (max(all_x) - min(all_x)) * 0.1
+        margin_y = (max(all_y) - min(all_y)) * 0.1
+        ax.set_xlim(min(all_x) - margin_x, max(all_x) + margin_x)
+        ax.set_ylim(min(all_y) - margin_y, max(all_y) + margin_y)
+        
+        ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik)
+        ax.set_aspect('equal')
+        ax.set_title("Carte des tournées - Vue d'ensemble", fontsize=16, fontweight='bold')
+        ax.axis("off")
+        ax.legend(loc='upper left', bbox_to_anchor=(0, 1))
+        
+        plt.tight_layout()
+        plt.savefig(output_image_path, dpi=150, bbox_inches='tight')
+        plt.close(fig)
+        
+        return True
+        
+    except Exception as e:
+        print(f"Erreur lors de la création de la carte: {e}")
+        return False
