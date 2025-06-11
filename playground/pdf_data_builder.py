@@ -39,6 +39,18 @@ def getMatrix(file_matrix_csv):
     return dist_matrice, dur_matrice
 
 
+def get_adresses_pharmacie(file_coordinate_csv):
+    adresses = {}
+    
+    with open(file_coordinate_csv, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            id_pharma = int(row['id'])
+            nom = row['name']
+            adresses[id_pharma] = nom
+ 
+    return adresses
+
 """ 
 Analyse un texte contenant des routes au format 'chemin: id1 -> id2 -> id3 | ...' et extrait la liste des itinéraires
   Parameters:
@@ -74,8 +86,9 @@ Construit un objet JSON détaillant les trajets, durées, distances et coûts à
   Returns:
     - dict : objet avec informations sur chaque camion (trajet, durée, distance, coût carburant)
 """
-def createJsonObject(file_matrix_csv, tab):
+def createJsonObject(file_matrix_csv, file_coordinate_csv, tab):
     matrix_dist, matrix_time = getMatrix(file_matrix_csv)
+    adresses = get_adresses_pharmacie(file_coordinate_csv)
     result = {}
 
     for i, item in enumerate(tab):
@@ -113,8 +126,14 @@ def createJsonObject(file_matrix_csv, tab):
             heure_arrivee = heure_depart + timedelta(minutes=duree)
 
             etape = {
-                "pharmacie_depart_id": depart,
-                "pharmacie_arrivee_id": arrivee,
+                "pharmacie_depart":{
+                    "pharmacie_depart_id": depart,
+                    "nom_pharmacie": adresses[depart]
+                },
+                "pharmacie_arrivee": {
+                    "pharmacie_arrivee_id": arrivee,
+                    "nom_pharmacie": adresses[arrivee]
+                },
                 "heure_depart": heure_depart.strftime("%H:%M"),
                 "heure_arrivee": heure_arrivee.strftime("%H:%M")
             }
@@ -171,7 +190,7 @@ Lit le fichier output_file, parse les routes, et crée un objet JSON des trajets
     Note:
         Ne lance pas l'exécution du programme externe, output_file doit exister.
 """
-def generate_routes_from_file(file_matrix_csv, output_file): 
+def generate_routes_from_file(file_matrix_csv, file_coordinate_csv, output_file): 
     try:
         with open(output_file, 'r', encoding='utf-8') as f:
             text = f.read()
@@ -183,7 +202,7 @@ def generate_routes_from_file(file_matrix_csv, output_file):
         tab = parse_routes_from_text(text)
         print("Routes parsées :", tab)
         
-        result = createJsonObject(file_matrix_csv, tab)
+        result = createJsonObject(file_matrix_csv, file_coordinate_csv, tab)
         print("Objet JSON créé :")
         pprint.pprint(result)
         
@@ -192,7 +211,6 @@ def generate_routes_from_file(file_matrix_csv, output_file):
     except Exception as e:
         print("Erreur dans generate_routes_from_file :", str(e))
         return {"error": "generate_routes_from_file() error : " + str(e)}
-
 
 def create_route_map(routes_data, coords_csv_path, output_image_path):
     """
