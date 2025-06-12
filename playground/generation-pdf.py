@@ -5,8 +5,8 @@ import os
 
 def main():
     # Configuration
-    file_matrix_csv = "data/matrix_10.csv" 
-    coords_csv_path = "data/coordinates_10.csv" 
+    file_matrix_csv = "data/matrix_85.csv" 
+    coords_csv_path = "data/coordinates_85.csv" 
     output_file = "output.txt"
   
     
@@ -33,15 +33,15 @@ def main():
     if map_created and os.path.exists(temp_map_path):
         pdf.add_page()
         pdf.set_font("Arial", "B", 20)
-        pdf.cell(0, 20, "CARTE GÉNÉRALE DES TOURNÉES", ln=True, align='C')
-        pdf.ln(10)
+        pdf.cell(0, 0, "CARTE GÉNÉRALE DES TOURNÉES", ln=True, align='C')
+        pdf.ln(30)
         
         # Ajouter l'image de la carte
         page_width = pdf.w - 20  # Largeur de page moins marges
         page_height = pdf.h - 60  # Hauteur de page moins marges et titre
         
         # Insérer l'image (FPDF ajuste automatiquement les proportions)
-        pdf.image(temp_map_path, x=10, y=40, w=page_width)
+        pdf.image(temp_map_path, w=page_width, h=page_height-10)
     
     for camion, infos in obj.items():
         pdf.add_page()

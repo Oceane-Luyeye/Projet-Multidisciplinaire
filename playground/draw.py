@@ -55,7 +55,7 @@ def plot_routes(routes, coords_df, output_image=None):
     id_to_coord = {int(row['id']): (row['longitude'], row['latitude'])
                    for _, row in coords_df.iterrows()}
 
-    plt.figure(figsize=(10,10))
+    plt.figure(figsize=(7,5))
     cmap = plt.get_cmap('tab10')
 
     # Plot all points with ID labels

@@ -357,12 +357,12 @@ def create_route_map(routes_data, coords_csv_path, output_image_path):
         
         ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik)
         ax.set_aspect('equal')
-        ax.set_title("Carte des tournées - Vue d'ensemble", fontsize=16, fontweight='bold')
+        ax.set_title("Carte des tournées - Vue d'ensemble", fontsize=8, fontweight='bold')
         ax.axis("off")
         ax.legend(loc='upper left', bbox_to_anchor=(0, 1))
         
         plt.tight_layout()
-        plt.savefig(output_image_path, dpi=150, bbox_inches='tight')
+        plt.savefig(output_image_path, dpi=120, bbox_inches='tight')
         plt.close(fig)
         
         return True
