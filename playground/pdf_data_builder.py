@@ -141,24 +141,25 @@ Compile et exécute un programme externe 'genetic' (via make), avec les paramèt
     - min_truck (int) : nombre minimum de camions.
     - max_truck (int) : nombre maximum de camions.
 """
-def execute(file_matrix_csv, min_truck, max_truck):
+def execute(file_matrix_csv, *_): 
     try:
         compile_result = subprocess.run(["make"], capture_output=True, text=True)
         if compile_result.returncode != 0:
             print("Erreur de compilation :", compile_result.stderr)
             return "execute() error :" + compile_result.stderr
 
-        result = subprocess.run(["./genetic", file_matrix_csv, str(min_truck), str(max_truck)], capture_output=True, text=True)
+        result = subprocess.run(["./genetic", file_matrix_csv], capture_output=True, text=True)
         if result.returncode != 0:
             print("Erreur d'exécution :", result.stderr)
             return "execute() error : " + result.stderr
-        
+
         print("Exécution réussie du programme genetic")
         return result.stdout
-        
+
     except Exception as e:
         print("Exception lors de l'exécution :", str(e))
         return "error : " + str(e)
+
 
 
 """
@@ -194,6 +195,8 @@ def generate_routes_from_file(file_matrix_csv, output_file):
         return {"error": "generate_routes_from_file() error : " + str(e)}
 
 
+import random  # Ajoute ceci en haut avec les imports existants
+
 def create_route_map(routes_data, coords_csv_path, output_image_path):
     """
     Crée une carte des trajets et la sauvegarde en image
@@ -227,12 +230,14 @@ def create_route_map(routes_data, coords_csv_path, output_image_path):
         
         fig, ax = plt.subplots(figsize=(12, 8))
         
-        custom_colors = [
-            "red", "green", "blue", "orange", "purple", "cyan",
-            "#FF00FF", "#00FFFF", "#FFD700", "#8B0000", "#7FFF00",
-            "#FF69B4", "#00BFFF", "#DAA520", "#556B2F", "#A52A2A",
-            "#800080", "#2E8B57", "#B22222", "#5F9EA0"
-        ]
+        # Générateur de couleurs uniques
+        used_colors = set()
+        def generate_unique_color():
+            while True:
+                color = "#%06x" % random.randint(0, 0xFFFFFF)
+                if color not in used_colors:
+                    used_colors.add(color)
+                    return color
         
         all_points = []
         
@@ -250,7 +255,7 @@ def create_route_map(routes_data, coords_csv_path, output_image_path):
                     crs="EPSG:4326"
                 ).to_crs(epsg=3857)
                 
-                color = custom_colors[i % len(custom_colors)]
+                color = generate_unique_color()
                 ax.plot(gdf.geometry.x, gdf.geometry.y, 
                        marker='o', linestyle='-', linewidth=2, markersize=6,
                        color=color, label=f"Camion {i+1}")

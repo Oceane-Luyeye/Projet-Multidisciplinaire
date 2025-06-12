@@ -13,7 +13,7 @@ def main():
     
     # Exécute l'algo
     print("Exécution de l'algorithme génétique...")
-    execute(file_matrix_csv, min_truck, max_truck)
+    execute(file_matrix_csv)
     obj = generate_routes_from_file(file_matrix_csv, output_file)
     
     if "error" in obj:
