@@ -5,35 +5,42 @@ import pandas as pd
 import requests
 import openrouteservice
 
+# Configuration
 api_key = "5b3ce3597851110001cf62487e2739ab43d8469aa4faf8da7acc850d"
-base_csv_path = 'RENDU/data/input/livraison10.csv'
-all_csv_path = 'RENDU/data/database/all.csv'
-output_dir = 'RENDU/data/output/csv/'
+base_csv_path = 'data/input/livraison70.csv'
+all_csv_path = 'data/database/all.csv'
+output_dir = 'data/output/csv/'
 
-
-
+# Chargement des données
 base_df = pd.read_csv(base_csv_path, header=None, names=['name', 'street', 'postal_code', 'city'])
 all_df = pd.read_csv(all_csv_path)
 
-# .merge to get coordinates
+# Sélection du dépôt (premier match contenant "dépôt")
+depot_row = all_df[all_df['name'].str.lower().str.contains('dépôt', case=False)].iloc[0:1].copy()
+
+# Fusion des adresses clients avec coordonnées
 merged_df = pd.merge(base_df, all_df, on=['name', 'street', 'postal_code', 'city'], how='inner')
 merged_df = merged_df[['name', 'street', 'postal_code', 'city', 'latitude', 'longitude']]
-merged_df.insert(0, 'id', range(len(merged_df)))
 
-coord_filename = f'coordinates_{len(merged_df)}.csv'
-coord_path = os.path.join(output_dir, coord_filename)
-merged_df.to_csv(coord_path, index=False)
-print(f" saved in : {coord_path}")
+# Ajout du dépôt au début avec id=0
+full_df = pd.concat([depot_row, merged_df], ignore_index=True)
+full_df.insert(0, 'id', range(len(full_df)))
 
+# Création du suffixe basé sur le nombre de clients (hors dépôt)
+suffix = len(full_df) - 1
 
+# Sauvegarde des coordonnées
+coord_path = os.path.join(output_dir, f'coordinates_{suffix}.csv')
+full_df.to_csv(coord_path, index=False)
+print(f"📍 Coordonnées enregistrées dans : {coord_path}")
 
-# Load coordinates again
+# Chargement des coordonnées
 df_coords = pd.read_csv(coord_path)
 required_columns = {'id', 'latitude', 'longitude'}
 if not required_columns.issubset(df_coords.columns):
     raise ValueError(f"Le fichier doit contenir les colonnes : {required_columns}")
 
-# Prepare locations and IDs
+# Préparation des points
 locations = []
 ids = []
 for _, row in df_coords.iterrows():
@@ -45,17 +52,15 @@ for _, row in df_coords.iterrows():
     except ValueError:
         print(f" coordonnées invalides ignorées : {row}")
 
-# setup
+# Configuration ORS
 client = openrouteservice.Client(key=api_key)
-MAX_ROUTES = 3500 # imposé par api
+MAX_ROUTES = 3500
 N = len(locations)
 max_block = int(math.floor(math.sqrt(MAX_ROUTES)))
-print(f"🔢 Nombre de points : {N} | Taille max bloc : {max_block} x {max_block}")
+print(f"Nombre de points (incluant dépôt) : {N} | Taille max bloc : {max_block} x {max_block}")
 
-# Output matrix CSV
-matrix_filename = f'matrix_{len(df_coords)}.csv'
-matrix_path = os.path.join(output_dir, matrix_filename)
-
+# Génération de la matrice
+matrix_path = os.path.join(output_dir, f'matrix_{suffix}.csv')
 count = 0
 with open(matrix_path, 'w', newline='', encoding='utf-8') as f_out:
     writer = csv.writer(f_out)
@@ -110,16 +115,17 @@ with open(matrix_path, 'w', newline='', encoding='utf-8') as f_out:
                 print(f"echec appel ORS bloc {i_start}-{j_start} : {response.status_code} - {response.text}")
                 exit(1)
 
-print(f"\n Matrice générée : {matrix_path} | Total lignes : {count}")
+print(f"\n Matrice générée : {matrix_path} | Total de lignes : {count}")
 
-# Sort and verify
-print("tri des lignes...")
+# Tri final
+print("Tri des lignes par origin_id/destination_id...")
 df_matrix = pd.read_csv(matrix_path)
 df_sorted = df_matrix.sort_values(by=['origin_id', 'destination_id'])
 df_sorted.to_csv(matrix_path, index=False)
-print("mtrice triée par origin_id puis destination_id.")
+print("✅ Matrice triée.")
 
-print("\n🔍 Vérification de la complétude...")
+# Vérification
+print("\n Vérification de la complétude...")
 expected_count = N - 1
 missing_flag = False
 grouped = df_sorted.groupby('origin_id').size()
@@ -131,4 +137,4 @@ for origin_id in sorted(ids):
         missing_flag = True
 
 if not missing_flag:
-    print("All lignes attendues sont présentes pour chaque id")
+    print("✅ Toutes les lignes attendues sont présentes pour chaque id (sauf self-loop exclue).")

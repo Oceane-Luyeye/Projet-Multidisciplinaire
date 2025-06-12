@@ -1,27 +1,48 @@
+/* genetic_vrp_cli.c
+ * Command-line Genetic Algorithm for Vehicle Routing Problem (VRP).
+ * Reads CSV with columns: origin_id,destination_id,distance_km,time_min
+ * Usage:
+ *   ./genetic_vrp_cli <matrix_csv> [min_trucks max_trucks]
+ * If min_trucks and max_trucks are omitted, the program uses
+ *   min_trucks = n_points/10, max_trucks = n_points/5.
+ * IDs in the CSV should be 0-based (0 = depot, 1..N = customers).
+ * Outputs best solution per truck count and global best, and writes
+ *   each route’s distance & time into output.txt.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <time.h>
 
+/* Hyperparameters */
 #define POP_SIZE 300
 #define GENERATIONS 10000
-#define MUTATION_RATE 0.1
-#define ELITE_FRAC 0.35
-#define SKIP_NO_CHANGE 2000
-#define IDX(i, j) ((i) * n_points + (j))
+#define MUTATION_RATE 0.075
+#define ELITE_FRAC 0.45
+#define MAX_DURATION 180.0
+#define STOP_TIME 3.0
+#define PENALTY_BASE 1e6
+#define PENALTY_RATE 10.0
+#define SKIP_NO_CHANGE 5000
 
+/* Individual representation */
 typedef struct
 {
-    int *perm;
-    double fitness;
+    int *perm;      // permutation of customer IDs (1..n_points-1)
+    int trucks;     // number of trucks/routes
+    double fitness; // total distance (with penalties)
 } Individual;
 
-static double *time_mat;
-static double *dist_mat;
-static int n_points;
+/* Global data */
+static int n_points;     // total number of points (including depot = 0)
+static double *dist_mat; // flattened n_points × n_points distance matrix
+static double *time_mat; // flattened n_points × n_points travel-time matrix
+#define IDX(i, j) ((i) * n_points + (j))
 
-void load_matrix(const char *path)
+/* Load matrices from CSV (expects IDs 0..max_id, 0 = depot) */
+void load_matrices(const char *path)
 {
     FILE *f = fopen(path, "r");
     if (!f)
@@ -29,14 +50,15 @@ void load_matrix(const char *path)
         perror("fopen");
         exit(1);
     }
-
     char line[256];
     int max_id = 0;
-    fgets(line, sizeof(line), f);
+
+    /* First pass: find highest ID */
+    fgets(line, sizeof(line), f); // skip header
     while (fgets(line, sizeof(line), f))
     {
         int o, d;
-        if (sscanf(line, "%d,%d,%*f,%*f", &o, &d) == 2)
+        if (sscanf(line, "%d,%d,%*f,%*f", &o, &d) >= 2)
         {
             if (o > max_id)
                 max_id = o;
@@ -44,400 +66,495 @@ void load_matrix(const char *path)
                 max_id = d;
         }
     }
+    /* Since IDs are 0-based, total points = max_id + 1 */
     n_points = max_id + 1;
 
-    dist_mat = malloc(n_points * n_points * sizeof(double));
-    time_mat = malloc(n_points * n_points * sizeof(double));
+    /* Allocate flattened matrices */
+    dist_mat = calloc((size_t)n_points * n_points, sizeof(double));
+    time_mat = calloc((size_t)n_points * n_points, sizeof(double));
     if (!dist_mat || !time_mat)
     {
         fprintf(stderr, "Allocation failed\n");
         exit(1);
     }
 
-    for (int i = 0; i < n_points * n_points; i++)
-    {
-        dist_mat[i] = -1.0;
-        time_mat[i] = -1.0;
-    }
-
+    /* Second pass: read distances and times */
     rewind(f);
-    fgets(line, sizeof(line), f);
+    fgets(line, sizeof(line), f); // skip header again
     while (fgets(line, sizeof(line), f))
     {
         int o, d;
         double dk, tm;
         if (sscanf(line, "%d,%d,%lf,%lf", &o, &d, &dk, &tm) == 4)
         {
-            dist_mat[IDX(o, d)] = dk;
-            time_mat[IDX(o, d)] = tm;
+            /* Use IDs directly (0-based) */
+            int i = o;
+            int j = d;
+            dist_mat[IDX(i, j)] = dk;
+            time_mat[IDX(i, j)] = tm;
         }
     }
-
     fclose(f);
-}
 
-void two_opt_strict(int *perm, int len, int depot)
-{
-    int improved = 1;
-    int max_iter = 500; // limite boucles pour éviter les boucles infinies
-    int iter = 0;
-
-    while (improved && iter++ < max_iter)
+    /* Fill symmetric entries (assume undirected) */
+    for (int i = 0; i < n_points; i++)
     {
-        improved = 0;
-        for (int i = 0; i < len - 1; i++)
+        for (int j = i + 1; j < n_points; j++)
         {
-            for (int j = i + 1; j < len; j++)
-            {
-                int a = (i == 0) ? depot : perm[i - 1];
-                int b = perm[i];
-                int c = perm[j];
-                int d = (j + 1 == len) ? depot : perm[j + 1];
-
-                double before = dist_mat[IDX(a, b)] + dist_mat[IDX(c, d)];
-                double after = dist_mat[IDX(a, c)] + dist_mat[IDX(b, d)];
-
-                if (after < before)
-                {
-                    // inversion du segment
-                    for (int k = 0; k <= (j - i) / 2; k++)
-                    {
-                        int tmp = perm[i + k];
-                        perm[i + k] = perm[j - k];
-                        perm[j - k] = tmp;
-                    }
-                    improved = 1;
-                }
-            }
+            dist_mat[IDX(j, i)] = dist_mat[IDX(i, j)];
+            time_mat[IDX(j, i)] = time_mat[IDX(i, j)];
         }
     }
 }
 
-double eval_split_distance(int *perm, int len)
+/* Initialize population of size POP_SIZE for a given number of trucks */
+Individual *init_pop(int trucks)
 {
-    int i = 0;
-    double total_dist_all = 0.0;
-
-    while (i < len)
+    int nc = n_points - 1; // number of customers (exclude depot 0)
+    int *cust = malloc(nc * sizeof(int));
+    if (!cust)
     {
-        double current_time = 0.0, current_dist = 0.0;
-        int start = i, prev = 0;
-
-        while (i < len)
-        {
-            int next = perm[i];
-            double to_next = time_mat[IDX(prev, next)];
-            double to_depot = time_mat[IDX(next, 0)];
-            double projected_time = current_time + to_next + 3.0 + to_depot;
-            if (projected_time > 180.0)
-                break;
-            current_time += to_next + 3.0;
-            current_dist += dist_mat[IDX(prev, next)];
-            prev = next;
-            i++;
-        }
-
-        // copie et optimisation
-        int seg_len = i - start;
-        int *segment = malloc(seg_len * sizeof(int));
-        memcpy(segment, &perm[start], seg_len * sizeof(int));
-        two_opt_strict(segment, seg_len, 0);
-
-        // recalcul du cout
-        prev = 0;
-        double optimized_dist = 0.0;
-        for (int j = 0; j < seg_len; j++)
-        {
-            optimized_dist += dist_mat[IDX(prev, segment[j])];
-            prev = segment[j];
-        }
-        optimized_dist += dist_mat[IDX(prev, 0)];
-
-        total_dist_all += optimized_dist;
-        free(segment);
+        fprintf(stderr, "Allocation failed\n");
+        exit(1);
+    }
+    /* Customer IDs = 1..(n_points-1) */
+    for (int i = 1; i < n_points; i++)
+    {
+        cust[i - 1] = i;
     }
 
-    return total_dist_all;
+    Individual *pop = malloc(POP_SIZE * sizeof(Individual));
+    if (!pop)
+    {
+        fprintf(stderr, "Allocation failed\n");
+        exit(1);
+    }
+
+    for (int p = 0; p < POP_SIZE; p++)
+    {
+        pop[p].trucks = trucks;
+        pop[p].perm = malloc(nc * sizeof(int));
+        if (!pop[p].perm)
+        {
+            fprintf(stderr, "Allocation failed\n");
+            exit(1);
+        }
+        /* Copy the customer list and shuffle */
+        memcpy(pop[p].perm, cust, nc * sizeof(int));
+        for (int i = nc - 1; i > 0; i--)
+        {
+            int j = rand() % (i + 1);
+            int t = pop[p].perm[i];
+            pop[p].perm[i] = pop[p].perm[j];
+            pop[p].perm[j] = t;
+        }
+    }
+    free(cust);
+    return pop;
 }
 
+/* Evaluate fitness (total dist + penalty) of one individual */
 void eval_ind(Individual *ind)
 {
-    ind->fitness = eval_split_distance(ind->perm, n_points - 1);
+    int nc = n_points - 1; // customers
+    int trucks = ind->trucks;
+    int size = (nc + trucks - 1) / trucks; // ceil(nc / trucks)
+    double tot = 0.0;
+
+    for (int t = 0; t < trucks; ++t)
+    {
+        int start = t * size;
+        int end = start + size;
+        if (end > nc)
+            end = nc;
+
+        double tt = 0.0; // total travel‐time for this truck
+        int prev = 0;    // start at depot (0)
+
+        for (int i = start; i < end; ++i)
+        {
+            int c = ind->perm[i];
+            if (c < 0 || c >= n_points)
+                continue; // safety
+            tot += dist_mat[IDX(prev, c)];
+            tt += time_mat[IDX(prev, c)] + STOP_TIME;
+            prev = c;
+        }
+        /* Return to depot */
+        tot += dist_mat[IDX(prev, 0)];
+        tt += time_mat[IDX(prev, 0)];
+
+        /* Add penalty if over max duration */
+        if (tt > MAX_DURATION)
+        {
+            tot += PENALTY_BASE + (tt - MAX_DURATION) * PENALTY_RATE;
+        }
+    }
+    ind->fitness = tot;
 }
 
+/* Comparator for qsort: ascending fitness */
 int cmp_ind(const void *a, const void *b)
 {
     double fa = ((Individual *)a)->fitness;
     double fb = ((Individual *)b)->fitness;
-    return (fa > fb) - (fa < fb);
+    if (fa < fb)
+        return -1;
+    if (fa > fb)
+        return 1;
+    return 0;
 }
 
-void two_opt(int *perm, int nc)
-{
-    int improved = 1;
-    int max_iter = 500, iter = 0;
-    while (improved && iter++ < max_iter)
-    {
-        improved = 0;
-        for (int i = 0; i < nc - 1; i++)
-        {
-            for (int j = i + 2; j < nc; j++)
-            {
-                int A = (i == 0) ? 0 : perm[i - 1];
-                int B = perm[i];
-                int C = perm[j];
-                int D = (j + 1 == nc) ? 0 : perm[j + 1];
-
-                double before = dist_mat[IDX(A, B)] + dist_mat[IDX(C, D)];
-                double after = dist_mat[IDX(A, C)] + dist_mat[IDX(B, D)];
-
-                if (after < before)
-                {
-                    // inversion le segment
-                    for (int k = 0; k < (j - i + 1) / 2; k++)
-                    {
-                        int tmp = perm[i + k];
-                        perm[i + k] = perm[j - k];
-                        perm[j - k] = tmp;
-                    }
-                    improved = 1;
-                }
-            }
-        }
-    }
-}
-
-void advanced_mutation(int *perm, int nc)
-{
-    int op = rand() % 3;
-    int i = rand() % nc, j = rand() % nc;
-    if (op == 0)
-    {
-        int tmp = perm[i];
-        perm[i] = perm[j];
-        perm[j] = tmp;
-    }
-    else if (op == 1)
-    {
-        if (i > j)
-        {
-            int tmp = i;
-            i = j;
-            j = tmp;
-        }
-        while (i < j)
-        {
-            int tmp = perm[i];
-            perm[i++] = perm[j];
-            perm[j--] = tmp;
-        }
-    }
-    else
-    {
-        int val = perm[i];
-        if (i < j)
-            memmove(&perm[i], &perm[i + 1], (j - i) * sizeof(int));
-        else
-            memmove(&perm[j + 1], &perm[j], (i - j) * sizeof(int));
-        perm[j] = val;
-    }
-}
-
-Individual run_ga()
+/* Run GA for a fixed number of trucks, return best Individual (caller must free .perm) */
+Individual run_ga(int trucks)
 {
     int nc = n_points - 1;
-    Individual *pop = malloc(POP_SIZE * sizeof(Individual));
-    int *base = malloc(nc * sizeof(int));
-    for (int i = 0; i < nc; i++)
-        base[i] = i + 1;
+    /* Initialize population */
+    Individual *pop = init_pop(trucks);
+    int elite = (int)(POP_SIZE * ELITE_FRAC);
+    if (elite < 2)
+        elite = 2;
 
-    for (int i = 0; i < POP_SIZE; i++)
+    /* Prepare best‐so‐far */
+    Individual best;
+    best.perm = malloc(nc * sizeof(int));
+    if (!best.perm)
     {
-        pop[i].perm = malloc(nc * sizeof(int));
-        memcpy(pop[i].perm, base, nc * sizeof(int));
-        for (int j = nc - 1; j > 0; j--)
-        {
-            int k = rand() % (j + 1);
-            int tmp = pop[i].perm[j];
-            pop[i].perm[j] = pop[i].perm[k];
-            pop[i].perm[k] = tmp;
-        }
+        fprintf(stderr, "Allocation failed\n");
+        exit(1);
     }
-
-    Individual best = {malloc(nc * sizeof(int)), INFINITY};
-    int stagnant = 0;
+    best.trucks = trucks;
+    best.fitness = INFINITY;
+    int cpt = 0; // count of generations with no improvement
 
     for (int gen = 0; gen < GENERATIONS; gen++)
     {
+        /* Evaluate all */
         for (int i = 0; i < POP_SIZE; i++)
+        {
             eval_ind(&pop[i]);
+        }
+        /* Sort by fitness (ascending) */
         qsort(pop, POP_SIZE, sizeof(Individual), cmp_ind);
 
+        /* Check for new best */
         if (pop[0].fitness < best.fitness)
         {
             best.fitness = pop[0].fitness;
+            cpt = 0;
             memcpy(best.perm, pop[0].perm, nc * sizeof(int));
-            stagnant = 0;
         }
-        else if (++stagnant > SKIP_NO_CHANGE)
-            break;
+        else
+        {
+            cpt++;
+            if (cpt > SKIP_NO_CHANGE)
+            {
+                printf("No improvement for %d generations, stopping.\n", SKIP_NO_CHANGE);
+                printf("Gen: %d\n", gen);
+                break;
+            }
+        }
 
-        if (gen % 500 == 0)
-            printf("Gen %d | Best: %.2f\n", gen, best.fitness);
-
+        /* Create next generation */
         Individual *next = malloc(POP_SIZE * sizeof(Individual));
-        int elite = POP_SIZE * ELITE_FRAC;
+        if (!next)
+        {
+            fprintf(stderr, "Allocation failed\n");
+            exit(1);
+        }
+        int idx = 0;
+
+        /* Copy elites */
         for (int i = 0; i < elite; i++)
         {
-            next[i].perm = malloc(nc * sizeof(int));
-            memcpy(next[i].perm, pop[i].perm, nc * sizeof(int));
+            next[idx].trucks = pop[i].trucks;
+            next[idx].perm = malloc(nc * sizeof(int));
+            if (!next[idx].perm)
+            {
+                fprintf(stderr, "Allocation failed\n");
+                exit(1);
+            }
+            memcpy(next[idx].perm, pop[i].perm, nc * sizeof(int));
+            idx++;
         }
 
-        int idx = elite;
+        /* Generate offspring until next is full */
         while (idx < POP_SIZE)
         {
+            /* Pick two parents from top half */
             Individual *p1 = &pop[rand() % (POP_SIZE / 2)];
             Individual *p2 = &pop[rand() % (POP_SIZE / 2)];
-            int a = rand() % nc, b = rand() % nc;
+
+            /* Ordered crossover */
+            int a = rand() % nc;
+            int b = rand() % nc;
             if (a > b)
             {
-                int tmp = a;
+                int t = a;
                 a = b;
-                b = tmp;
+                b = t;
             }
 
-            int *child = malloc(nc * sizeof(int));
-            for (int i = 0; i < nc; i++)
-                child[i] = -1;
+            int *c1 = calloc(nc, sizeof(int));
+            int *c2 = calloc(nc, sizeof(int));
+            if (!c1 || !c2)
+            {
+                fprintf(stderr, "Allocation failed\n");
+                exit(1);
+            }
+
+            /* Copy segment [a..b) */
             for (int i = a; i < b; i++)
-                child[i] = p1->perm[i];
-            int pos = b;
+            {
+                c1[i] = p1->perm[i];
+                c2[i] = p2->perm[i];
+            }
+
+            /* Fill remainder for c1 from p2 */
+            int pos1 = b;
             for (int i = 0; i < nc; i++)
             {
                 int gene = p2->perm[(b + i) % nc];
                 int found = 0;
-                for (int j = a; j < b; j++)
-                    if (child[j] == gene)
+                for (int k = a; k < b; k++)
+                {
+                    if (c1[k] == gene)
                     {
                         found = 1;
                         break;
                     }
+                }
                 if (!found)
                 {
-                    while (child[pos % nc] != -1)
-                        pos++;
-                    child[pos % nc] = gene;
+                    if (pos1 >= nc)
+                        pos1 = 0;
+                    c1[pos1++] = gene;
                 }
             }
-            if ((rand() / (double)RAND_MAX) < MUTATION_RATE)
-                advanced_mutation(child, nc);
-            two_opt(child, nc);
+            /* Fill remainder for c2 from p1 */
+            int pos2 = b;
+            for (int i = 0; i < nc; i++)
+            {
+                int gene = p1->perm[(b + i) % nc];
+                int found = 0;
+                for (int k = a; k < b; k++)
+                {
+                    if (c2[k] == gene)
+                    {
+                        found = 1;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    if (pos2 >= nc)
+                        pos2 = 0;
+                    c2[pos2++] = gene;
+                }
+            }
 
-            next[idx++].perm = child;
+            /* Mutation: swap pairs in each child */
+            int swaps = (int)(nc * MUTATION_RATE);
+            for (int m = 0; m < swaps; m++)
+            {
+                int i = rand() % nc;
+                int j = rand() % nc;
+                int tmp = c1[i];
+                c1[i] = c1[j];
+                c1[j] = tmp;
+                tmp = c2[i];
+                c2[i] = c2[j];
+                c2[j] = tmp;
+            }
+
+            /* Add child 1 */
+            next[idx].trucks = trucks;
+            next[idx].perm = c1;
+            idx++;
+            /* Add child 2 if space remains */
+            if (idx < POP_SIZE)
+            {
+                next[idx].trucks = trucks;
+                next[idx].perm = c2;
+                idx++;
+            }
+            else
+            {
+                free(c2);
+            }
         }
 
+        /* Free old population */
         for (int i = 0; i < POP_SIZE; i++)
+        {
             free(pop[i].perm);
+        }
         free(pop);
         pop = next;
     }
 
+    /* Cleanup final population */
     for (int i = 0; i < POP_SIZE; i++)
+    {
         free(pop[i].perm);
+    }
     free(pop);
-    free(base);
-    return best;
-}
-
-
-
-void split_route(int *perm, int n)
-{
-    FILE *out = fopen("output.txt", "w");
-    if (!out)
-    {
-        perror("fopen(output.txt)");
-        return;
-    }
-
-    int i = 0, route_id = 1;
-    double total_time_all = 0.0, total_dist_all = 0.0;
-
-    while (i < n)
-    {
-        double current_time = 0.0, current_dist = 0.0;
-        int start = i, prev = 0;
-
-        while (i < n)
-        {
-            int next = perm[i];
-            double to_next = time_mat[IDX(prev, next)];
-            double to_depot = time_mat[IDX(next, 0)];
-            double projected_time = current_time + to_next + 3.0 + to_depot;
-            if (projected_time > 180.0)
-                break;
-            current_time += to_next + 3.0;
-            current_dist += dist_mat[IDX(prev, next)];
-            prev = next;
-            i++;
-        }
-
-        int len = i - start;
-        int *segment = malloc(len * sizeof(int));
-        memcpy(segment, &perm[start], len * sizeof(int));
-
-        two_opt_strict(segment, len, 0);
-
-        // recalcul du cout apres optim
-        current_time = 0.0;
-        current_dist = 0.0;
-        prev = 0;
-        for (int j = 0; j < len; j++)
-        {
-            current_time += time_mat[IDX(prev, segment[j])] + 3.0;
-            current_dist += dist_mat[IDX(prev, segment[j])];
-            prev = segment[j];
-        }
-        current_time += time_mat[IDX(prev, 0)];
-        current_dist += dist_mat[IDX(prev, 0)];
-
-        total_time_all += current_time;
-        total_dist_all += current_dist;
-
-        // Affichage + output
-        fprintf(out, "%d: 0", route_id);
-        printf("Truck %d: 0", route_id);
-        for (int j = 0; j < len; j++)
-        {
-            fprintf(out, " -> %d", segment[j]);
-            printf(" -> %d", segment[j]);
-        }
-        fprintf(out, " -> 0 | Distance: %.2f | Time: %.2f\n", current_dist, current_time);
-        printf(" -> 0\n    Time: %.2f min | Distance: %.2f km\n", current_time, current_dist);
-
-        route_id++;
-        free(segment);
-    }
-    printf("\nTOTAL: Time = %.2f min | Distance = %.2f km\n", total_time_all, total_dist_all);
-    fclose(out);
+    return best; // best.perm was malloc'd
 }
 
 int main(int argc, char **argv)
 {
     if (argc < 2)
     {
-        fprintf(stderr, "Usage: %s matrix.csv\n", argv[0]);
+        fprintf(stderr, "Usage: %s matrix.csv [min_trucks max_trucks]\n", argv[0]);
         return 1;
     }
+
     srand(time(NULL));
-    load_matrix(argv[1]);
-    Individual sol = run_ga();
-    printf("Best route: [0");
-    for (int i = 0; i < n_points - 1; i++)
-        printf(" -> %d", sol.perm[i]);
-    printf(" -> 0] | Distance = %.2f\n", sol.fitness);
-    split_route(sol.perm, n_points - 1);
-    free(sol.perm);
+    load_matrices(argv[1]);
+
+    int min_t, max_t;
+    if (argc == 4)
+    {
+        /* User provided a range */
+        min_t = atoi(argv[2]);
+        max_t = atoi(argv[3]);
+        if (min_t < 1 || max_t < min_t)
+        {
+            fprintf(stderr, "Error: need 1 <= min_trucks <= max_trucks.\n");
+            return 1;
+        }
+    }
+    else
+    {
+        /* Fallback to heuristic based on number of points */
+        min_t = n_points / 10;
+        max_t = n_points / 4;
+        if (min_t < 1)
+            min_t = 1;
+        if (max_t < min_t)
+            max_t = min_t;
+    }
+
+    printf("GA trucks %d..%d\n", min_t, max_t);
+
+    Individual global = {NULL, 0, INFINITY};
+    int gk = min_t;
+
+    for (int k = min_t; k <= max_t; k++)
+    {
+        Individual sol = run_ga(k);
+        printf("%d trucks: %.2f\n", k, sol.fitness);
+        if (sol.fitness < global.fitness)
+        {
+            if (global.perm)
+                free(global.perm);
+            global = sol;
+            gk = k;
+        }
+        else
+        {
+            free(sol.perm);
+        }
+    }
+
+    printf("Best %d trucks:\n", gk);
+    int nc = n_points - 1;
+    int size = (nc + gk - 1) / gk;
+
+    double total_time_all = 0.0;
+    double total_dist_all = 0.0;
+
+    for (int t = 0; t < gk; ++t)
+    {
+        int start = t * size;
+        int end = start + size;
+        if (start >= nc)
+            break;
+        if (end > nc)
+            end = nc;
+
+        double route_dist = 0.0;
+        double route_time = 0.0;
+        int prev = 0;
+
+        printf("Truck %d: 0", t + 1);
+        for (int i = start; i < end; ++i)
+        {
+            int c = global.perm[i];
+            route_dist += dist_mat[IDX(prev, c)];
+            route_time += time_mat[IDX(prev, c)] + STOP_TIME;
+            prev = c;
+            printf(" -> %d", c);
+        }
+        route_dist += dist_mat[IDX(prev, 0)];
+        route_time += time_mat[IDX(prev, 0)];
+        printf(" -> 0\n");
+
+        printf("    Time: %.2f min | Distance: %.2f km\n", route_time, route_dist);
+
+        total_time_all += route_time;
+        total_dist_all += route_dist;
+    }
+    printf("TOTAL: Time = %.2f min | Distance = %.2f km\n", total_time_all, total_dist_all);
+
+    /* Write only the detailed routes + metrics into output.txt */
+    {
+        FILE *out = fopen("output.txt", "w");
+        if (!out)
+        {
+            perror("fopen(output.txt)");
+            // Continue even if file creation fails
+        }
+        else
+        {
+            int nc = n_points - 1;
+            int size = (nc + gk - 1) / gk;
+
+            /* For each truck, compute distance & time, and print one line */
+            for (int t = 0; t < gk; ++t)
+            {
+                int route_idx = t + 1;
+                int start = t * size;
+                int end = start + size;
+                if (start >= nc)
+                    break;
+                if (end > nc)
+                    end = nc;
+
+                /* Recompute distance & time for this route */
+                double route_dist = 0.0;
+                double route_time = 0.0;
+                int prev = 0;
+
+                /* From depot to first customer, through all, then back to depot */
+                for (int i = start; i < end; ++i)
+                {
+                    int c = global.perm[i];
+                    route_dist += dist_mat[IDX(prev, c)];
+                    route_time += time_mat[IDX(prev, c)] + STOP_TIME;
+                    prev = c;
+                }
+                /* Return to depot */
+                route_dist += dist_mat[IDX(prev, 0)];
+                route_time += time_mat[IDX(prev, 0)];
+
+                /* Print route and metrics */
+                fprintf(out, "%d: 0", route_idx);
+                for (int i = start; i < end; ++i)
+                {
+                    fprintf(out, " -> %d", global.perm[i]);
+                }
+                fprintf(out, " -> 0");
+                fprintf(out, " | Distance: %.2f | Time: %.2f\n",
+                        route_dist, route_time);
+            }
+
+            fclose(out);
+        }
+    }
+
+    free(global.perm);
     free(dist_mat);
     free(time_mat);
     return 0;

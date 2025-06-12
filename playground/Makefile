@@ -2,19 +2,18 @@ CC      = gcc
 CFLAGS  = -std=c11 -O2 -Wall
 LDFLAGS = -lm
 
-SRCS    = genetic.c
-OBJS    = $(SRCS:.c=.o)
-TARGET  = genetic
+TARGETS = genetic test2
 
-.PHONY: all clean
+all: $(TARGETS)
 
-all: $(TARGET)
+genetic: genetic.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-$(TARGET): $(OBJS)
+test2: test2.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f *.o $(TARGETS)
