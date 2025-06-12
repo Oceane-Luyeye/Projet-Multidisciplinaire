@@ -47,7 +47,7 @@ def main():
     # Save coordinates CSV
     coord_path = os.path.join(output_dir, f'coordinates_{suffix}.csv')
     full_df.to_csv(coord_path, index=False)
-    print(f"📍 Coordinates saved to: {coord_path}")
+    print(f"Coordinates saved to: {coord_path}")
 
     # Read back coordinates for matrix generation
     df_coords = pd.read_csv(coord_path)
@@ -131,14 +131,11 @@ def main():
     print(f"\nMatrix generated: {matrix_path} | Total rows: {count}")
 
     # Sort final CSV
-    print("Sorting by origin_id and destination_id...")
     df_matrix = pd.read_csv(matrix_path)
     df_sorted = df_matrix.sort_values(by=['origin_id', 'destination_id'])
     df_sorted.to_csv(matrix_path, index=False)
-    print("✅ Matrix sorted.")
 
     # Verification
-    print("\nVerifying completeness...")
     expected_per_origin = N - 1
     missing_flag = False
     grouped = df_sorted.groupby('origin_id').size()
@@ -148,9 +145,6 @@ def main():
         if found != expected_per_origin:
             print(f"Origin {origin} has {found} rows (expected {expected_per_origin})")
             missing_flag = True
-
-    if not missing_flag:
-        print("All expected rows present for each id (excluding self-loops).")
 
 if __name__ == "__main__":
     main()
