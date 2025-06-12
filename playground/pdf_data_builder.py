@@ -157,7 +157,7 @@ def createJsonObject(file_matrix_csv, file_coordinate_csv, tab):
             duree = matrix_time[depart][arrivee]
             distance = matrix_dist[depart][arrivee]
 
-            # +3 mintues
+            #+3 mintues
             if j > 0:
                 current_time += timedelta(minutes=3)
 
@@ -193,8 +193,8 @@ def createJsonObject(file_matrix_csv, file_coordinate_csv, tab):
             'trajet': trajet_dict,
             'duree_totale_min': trajet_data['time'],
             'distance_total_km': trajet_data['distance'],
-            'cout_carburant_eur': round(((distance_totale * 8.5) / 100) * 1.72, 2),
-            'total_carburant_litre': round((distance_totale * 8.5) / 100, 2)
+            'cout_carburant_eur': round(((float(trajet_data['distance'])* 8.5) / 100) * 1.72, 2),
+            'total_carburant_litre': round((float(trajet_data['distance']) * 8.5) / 100, 2)
         }
 
     return result
@@ -357,12 +357,12 @@ def create_route_map(routes_data, coords_csv_path, output_image_path):
         
         ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik)
         ax.set_aspect('equal')
-        ax.set_title("Carte des tournées - Vue d'ensemble", fontsize=8, fontweight='bold')
+        ax.set_title("Carte des tournées - Vue d'ensemble", fontsize=16, fontweight='bold')
         ax.axis("off")
         ax.legend(loc='upper left', bbox_to_anchor=(0, 1))
         
         plt.tight_layout()
-        plt.savefig(output_image_path, dpi=120, bbox_inches='tight')
+        plt.savefig(output_image_path, dpi=150, bbox_inches='tight')
         plt.close(fig)
         
         return True
