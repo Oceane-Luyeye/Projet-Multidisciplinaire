@@ -8,8 +8,7 @@ def main():
     file_matrix_csv = "./data/livraison50_matrix.csv"
     coords_csv_path = "./data/livraison50_coordinates.csv" 
     output_file = "output.txt"
-    min_truck = 1
-    max_truck = 10
+  
     
     # Exécute l'algo
     print("Exécution de l'algorithme génétique...")
