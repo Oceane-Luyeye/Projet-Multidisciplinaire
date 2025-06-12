@@ -1,0 +1,72 @@
+id,name,street,postal_code,city,latitude,longitude
+0,Dépôt, 600 Rue des Madeleines,77100, Mareuil-lès-Meaux,48.934926,2.874246
+1,Pharmacie de Saint-Jean - Mr et Mme Poisson,15 bis Rue Raymond Poincaré,77660,Saint-Jean-les-Deux-Jumeaux,48.950984,3.021592
+2,Pharmacie de Quincy-Voisins,22 Rue de Meaux,77860,Quincy-Voisins,48.900976,2.876766
+3,Pharmacie du Pays de l'Ourcq,2 Rue Jean Jaurès,77440,Lizy-sur-Ourcq,49.024825,3.020362
+4,PHARMACIE DE LA POSTE,2 All. de la Poste,77178,Saint-Pathus,49.070347,2.801769
+5,Pharmacie De Mauperthuis,44 Av. Pasteur,77410,Claye-Souilly,48.940741,2.6794
+6,Pharmacie Victor Hugo,54 Bd Victor Hugo,77220,Gretz-Armainvilliers,48.740468,2.726132
+7,PHARMACIE PRINCIPALE,26 Rue de Paris,77220,Gretz-Armainvilliers,48.740172,2.738448
+8,PHARMACIE DE JUILLY,6 Rue de la Source,77230,Juilly,49.014653,2.708968
+9,Pharmacie Dufour,4 Pl. de la République,60300,Baron,49.172116,2.733907
+10,Pharmacie Des Templiers,38 Rue des Caillets,77120,Coulommiers,48.817297,3.091134
+11,Pharmacie du Moulin,9 Pl. Alphonse Vion,77515,Pommeuse,48.806217,3.020071
+12,Pharmacie Forum Santé du Canal,69 Rue Jean Jaurès,77440,Lizy-sur-Ourcq,49.024682,3.022004
+13,Pharmacie de l'Ourcq,2 Pl. du Marché,77840,Crouy-sur-Ourcq,49.090488,3.075164
+14,Pharmacie Saint Georges,1 Rue de la République,77122,Monthyon,49.009659,2.83118
+15,Pharmacie Blassel,2 Rue du Vert Buisson,60330,Le Plessis-Belleville,49.092782,2.754047
+16,Pharmacie de Magny,40 Rue de la Clef des Champs,77700,Magny-le-Hongre,48.867429,2.813369
+17,Pharmacie Vauchier,18 Rue du Général de Gaulle,77174,Villeneuve-le-Comte,48.813409,2.829504
+18,Pharmacie de l'Eglise,4 Place de l’Église,77320,Choisy-en-Brie,48.758631,3.218955
+19,Pharmacie du Pont de la Ville,4 Rue de la Pêcherie,77120,Coulommiers,48.812503,3.083268
+20,Pharmacie Lcce -Pharmacie du centre,80 Rue du Général Leclerc,77450,Esbly,48.900584,2.811949
+21,Pharmacie de La Vallée du Morin,2 Pl. du Bouloi,77320,Jouy-sur-Morin,48.782857,3.305659
+22,Pharmacie du Faubourg,18 Rue du Faubourg,77260,La Ferté-sous-Jouarre,48.948053,3.132662
+23,PHARMACIE RATSIMBAZAFY,2 Rue de la Belle Étoile,77230,Longperrier,49.046389,2.662412
+24,Pharmacie du Golf à Bailly-romainvilliers,6 Bd des Sports,77700,Bailly-Romainvilliers,48.849982,2.81965
+25,Pharmacie Avicenne,33 Rue d'Esbly,77700,Coupvray,48.894811,2.794229
+26,Pharmacie Centrale Noël,19/21 Rue Beaurepaire,77120,Coulommiers,48.813526,3.083797
+27,Pharmacie Potellet-Collard,2 bis Rue des Hortensias,77160,Chenoise-Cucharmoy,48.616327,3.197391
+28,Pharmacie Delahaye et Servais,16 Rue de la Libération,60620,Betz,49.156262,2.954138
+29,PHARMACIE DU BEFFROI,9 Rue du Marché,77580,Crécy-la-chapelle,48.857311,2.908697
+30,Pharmacie du Centre,9 Rue de Paris,77220,Tournan-en-Brie,48.740163,2.764796
+31,Pharmacie Desabres,58 Bis Rue Victor Clairet,77910,Varreddes,49.004524,2.928761
+32,Pharmacie principale de Mareuil - Elsie Santé,30 mail Grande Haie,77100,Mareuil lès Meaux,48.93615,2.876124
+33,Pharmacie Des Pelletiers,10 Rue des Pelletiers,77160,La Ferté-sous-Jouarre,48.949478,3.130178
+34,Pharmacie Lepesme,2-4 Pl. Charles de Gaulle,77540,Rozay-en-Brie,48.683345,2.956902
+35,Pharmacie de la Mairie,60 Rue Charles de Gaulle,77720,Mormant,48.60694,2.890953
+36,Pharmacie Rombaux,8 Pl. Marius Haussy,60890,Mareuil-sur-Ourcq,49.137808,3.077449
+37,Pharmacie Des Saisons de Meaux,3 Avenue Roland Moreno,77124,Chauconin-Neufmontiers,48.959419,2.860787
+38,Pharmacie de l'Hotel de Ville,1 Pl. de l'Hôtel de ville,77260,La Ferté-sous-Jouarre,48.95022,3.129599
+39,Pharmacie de Jouarre,23 Grande Place,77640,Jouarre,48.926895,3.129969
+40,Pharmacie Lefeuvre-Garriot,34 Av. de Senlis,60800,Crépy-en-Valois,49.232469,2.878542
+41,La Pharmacie de Guignes,31 Rue de Troyes,77390,Guignes,48.630919,2.80994
+42,Pharmacie de Acy en Multien,36 Rue de la Libération,60620,Acy-en-Multien,49.156426,2.954135
+43,Pharmacie des Saints Pères nanteuil les meaux,Avenue Fridingen,77100,Nanteuil-lès-Meaux,48.936384,2.884618
+44,Pharmacie Principale,53 Rue nationale,60800,Crépy-en-Valois,49.236802,2.887699
+45,Grande Pharmacie Du centre,Rue Gérard de Nerval,77280,Othis,49.072507,2.676166
+46,Pharmacie Khin de St Germain sur Morin,20 Rue de Paris,77860,Saint-Germain-sur-Morin,48.881874,2.850669
+47,Pharmacie Darras,26 Rue Couperin,77390,Chaumes-en-Brie,48.665103,2.840983
+48,Pharmacie wellpharma Principale,4 Bd de la Marne,77120,Coulommiers,48.804265,3.091357
+49,Pharmacie de Pontcarré,85 Grande Rue,77135,Pontcarré,48.796652,2.705915
+50,Pharmacie ROSSET,56 Av. de Verdun,77470,Trilport,48.957707,2.951751
+51,Pharmacie de la Gare,3 Rue du Général Leclerc,77450,Esbly,48.900584,2.811949
+52,Pharmacie de Boissy,4 Rue de Rebais,77169,Boissy-le-Châtel,48.825186,3.14417
+53,Pharmacie Peda,32 Rue Paul Valentin,77410,Annet-sur-Marne,48.926018,2.71975
+54,Pharmacie de St Mard Elsie,24 Av. de la Font du Berger,77230,Saint-Mard,49.036117,2.684093
+55,Aprium Pharmacie St Soupplets,35 Rue du Bourget,77165,Saint-Soupplets,49.037219,2.804373
+56,Pharmacie des Remparts,6 Rue Charles de Gaulle,60800,Crépy-en-Valois,49.234527,2.887277
+57,Pharmacie de la Pierre Collinet,9 Rue Guillaume Briçonnet,77100,Meaux,48.94793,2.895375
+58,PHARMACIE LEFEBVRE TOULET KAREN,5 Rue de la Couture,77510,Villeneuve-sur-Bellot,48.861924,3.341367
+59,Pharmacie du Haudouin,6 Rue de la Croix Verte,60440,Nanteuil-le-Haudouin,49.13887,2.80958
+60,Pharmacie Centrale de Claye,60 Rue Jean Jaurès,77410,Claye-Souilly,48.945258,2.686254
+61,Pharmacie du Valois,56 Av. du Président John Kennedy,60800,Crépy-en-Valois,49.226409,2.881524
+62,PHARMACIE DU CŒUR DE LA BRIE,29-31 Rue de Paris,77320,La Ferté-Gaucher,48.780843,3.304961
+63,PHARMACIE DU MARCHÉ,5 Pl. du Marché,77580,Crécy-la-chapelle,48.861602,2.949923
+64,Pharmacie Godart,7 Rue Margueritte Perey,77610,Fontenay-Trésigny,48.706751,2.868672
+65,Pharmacie De La Gare,5 place Révolution,77680,Roissy en Brie,48.796146,2.650341
+66,Pharmacie d'Ile-de-France,"ZAC vaux, 4 Pl. de l'Île de France",77120,Coulommiers,49.046389,2.662412
+67,Pharmacie de Beton-Bazoches,1 Pl. de l'Église Saint-Denis,77320,Beton-Bazoches,48.701927,3.24437
+68,Pharmacie Parapharmacie des Sources,46 Rue du Plessis,77178,Saint-Pathus,49.07753,2.783077
+69,Pharmacie des Ormes,8 Rue Georges Faroy,77515,Faremoutiers,48.801006,2.985533
+70,Pharmacie de l'Église,3 Rue Maréchal Joffre,77470,Trilport,48.957825,2.945749
