@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <stdbool.h>
 
 #define POP_SIZE 300
 #define GENERATIONS 10000
@@ -10,6 +11,7 @@
 #define ELITE_FRAC 0.35
 #define SKIP_NO_CHANGE 2000
 #define IDX(i, j) ((i) * n_points + (j))
+#define TIME_LIMIT 180.0
 
 typedef struct
 {
@@ -29,10 +31,17 @@ void load_matrix(const char *path)
         perror("fopen");
         exit(1);
     }
-
     char line[256];
     int max_id = 0;
-    fgets(line, sizeof(line), f);
+
+    // Header
+    if (!fgets(line, sizeof(line), f))
+    {
+        fclose(f);
+        fprintf(stderr, "Erreur de lecture du header dans load_matrix\n");
+        exit(1);
+    }
+
     while (fgets(line, sizeof(line), f))
     {
         int o, d;
@@ -45,7 +54,6 @@ void load_matrix(const char *path)
         }
     }
     n_points = max_id + 1;
-
     dist_mat = malloc(n_points * n_points * sizeof(double));
     time_mat = malloc(n_points * n_points * sizeof(double));
     if (!dist_mat || !time_mat)
@@ -53,15 +61,20 @@ void load_matrix(const char *path)
         fprintf(stderr, "Allocation failed\n");
         exit(1);
     }
-
     for (int i = 0; i < n_points * n_points; i++)
     {
         dist_mat[i] = -1.0;
         time_mat[i] = -1.0;
     }
-
     rewind(f);
-    fgets(line, sizeof(line), f);
+
+    // Header (again)
+    if (!fgets(line, sizeof(line), f))
+    {
+        fclose(f);
+        fprintf(stderr, "Erreur de lecture du header (2) dans load_matrix\n");
+        exit(1);
+    }
     while (fgets(line, sizeof(line), f))
     {
         int o, d;
@@ -72,16 +85,14 @@ void load_matrix(const char *path)
             time_mat[IDX(o, d)] = tm;
         }
     }
-
     fclose(f);
 }
 
 void two_opt_strict(int *perm, int len, int depot)
 {
     int improved = 1;
-    int max_iter = 500; // limite boucles pour éviter les boucles infinies
+    int max_iter = 500; // LIMIT TO AVOID INFINITE LOOPS
     int iter = 0;
-
     while (improved && iter++ < max_iter)
     {
         improved = 0;
@@ -93,13 +104,10 @@ void two_opt_strict(int *perm, int len, int depot)
                 int b = perm[i];
                 int c = perm[j];
                 int d = (j + 1 == len) ? depot : perm[j + 1];
-
                 double before = dist_mat[IDX(a, b)] + dist_mat[IDX(c, d)];
                 double after = dist_mat[IDX(a, c)] + dist_mat[IDX(b, d)];
-
                 if (after < before)
                 {
-                    // inversion du segment
                     for (int k = 0; k <= (j - i) / 2; k++)
                     {
                         int tmp = perm[i + k];
@@ -113,38 +121,131 @@ void two_opt_strict(int *perm, int len, int depot)
     }
 }
 
-double eval_split_distance(int *perm, int len)
+// TIME OF A TOUR
+double compute_time(const int *segment, int seg_len)
 {
-    int i = 0;
-    double total_dist_all = 0.0;
-
-    while (i < len)
+    int prev = 0;
+    double total_time = 0.0;
+    for (int j = 0; j < seg_len; j++)
     {
-        double current_time = 0.0, current_dist = 0.0;
+        total_time += time_mat[IDX(prev, segment[j])] + 3.0;
+        prev = segment[j];
+    }
+    total_time += time_mat[IDX(prev, 0)];
+    return total_time;
+}
+
+// SPLIT AND OPTIMIZE SEGMENTS
+int split_and_optimize(const int *perm, int len, int **segments, int *seg_lengths, int max_segs)
+{
+    int seg_count = 0;
+    int i = 0;
+    while (i < len && seg_count < max_segs)
+    {
+        double current_time = 0.0;
         int start = i, prev = 0;
+        int last_feasible_i = i;
 
         while (i < len)
         {
             int next = perm[i];
             double to_next = time_mat[IDX(prev, next)];
-            double to_depot = time_mat[IDX(next, 0)];
-            double projected_time = current_time + to_next + 3.0 + to_depot;
-            if (projected_time > 180.0)
+            double candidate_time = current_time + to_next + 3.0;
+            double projected_total = candidate_time + time_mat[IDX(next, 0)];
+            if (projected_total > TIME_LIMIT)
                 break;
-            current_time += to_next + 3.0;
-            current_dist += dist_mat[IDX(prev, next)];
+            current_time = candidate_time;
             prev = next;
             i++;
+            last_feasible_i = i;
         }
 
-        // copie et optimisation
-        int seg_len = i - start;
+        int seg_len = last_feasible_i - start;
         int *segment = malloc(seg_len * sizeof(int));
         memcpy(segment, &perm[start], seg_len * sizeof(int));
+
         two_opt_strict(segment, seg_len, 0);
 
-        // recalcul du cout
-        prev = 0;
+        // VERIFY TIME LIMIT
+        double real_time = compute_time(segment, seg_len);
+
+        if (real_time > TIME_LIMIT && seg_len > 1)
+        {
+            // RESPLIT OPTIMISED SEGMENT
+            int *subsegments[100];
+            int subseg_lengths[100];
+            int nb = split_and_optimize(segment, seg_len, subsegments, subseg_lengths, 100);
+            for (int s = 0; s < nb && seg_count < max_segs; s++)
+            {
+                segments[seg_count] = subsegments[s];
+                seg_lengths[seg_count] = subseg_lengths[s];
+                seg_count++;
+            }
+            free(segment);
+        }
+        else
+        {
+            // KEEP
+            segments[seg_count] = segment;
+            seg_lengths[seg_count] = seg_len;
+            seg_count++;
+        }
+        i = last_feasible_i;
+    }
+    return seg_count;
+}
+
+// SPLIT SEGMENTS UNDER TIME LIMIT (inutile mais gardé si besoin d'une version simple)
+int split_segments_under_time_limit(const int *perm, int len, int **segments, int *seg_lengths, int max_segs)
+{
+    int seg_count = 0;
+    int i = 0;
+    while (i < len && seg_count < max_segs)
+    {
+        double current_time = 0.0;
+        int start = i, prev = 0;
+        int last_feasible_i = i;
+
+        while (i < len)
+        {
+            int next = perm[i];
+            double to_next = time_mat[IDX(prev, next)];
+            double candidate_time = current_time + to_next + 3.0;             // déplacement + arrêt
+            double projected_total = candidate_time + time_mat[IDX(next, 0)]; // ... + retour dépôt
+            if (projected_total > TIME_LIMIT)
+                break;
+            current_time = candidate_time;
+            prev = next;
+            i++;
+            last_feasible_i = i;
+        }
+
+        int seg_len = last_feasible_i - start;
+        segments[seg_count] = malloc(seg_len * sizeof(int));
+        memcpy(segments[seg_count], &perm[start], seg_len * sizeof(int));
+        seg_lengths[seg_count] = seg_len;
+        seg_count++;
+        // On continue la découpe à partir du client non servi
+        i = last_feasible_i;
+    }
+    return seg_count;
+}
+
+// FITNESS EVAL UTILISANT LA FONCTION AUXILIAIRE
+double eval_split_distance(const int *perm, int len)
+{
+    int max_segs = 100;
+    int *seg_lengths = malloc(max_segs * sizeof(int));
+    int **segments = malloc(max_segs * sizeof(int *));
+    double total_dist_all = 0.0;
+    int seg_count = split_and_optimize(perm, len, segments, seg_lengths, max_segs);
+
+    for (int s = 0; s < seg_count; s++)
+    {
+        int seg_len = seg_lengths[s];
+        int *segment = segments[s];
+
+        int prev = 0;
         double optimized_dist = 0.0;
         for (int j = 0; j < seg_len; j++)
         {
@@ -152,11 +253,11 @@ double eval_split_distance(int *perm, int len)
             prev = segment[j];
         }
         optimized_dist += dist_mat[IDX(prev, 0)];
-
         total_dist_all += optimized_dist;
         free(segment);
     }
-
+    free(segments);
+    free(seg_lengths);
     return total_dist_all;
 }
 
@@ -174,8 +275,7 @@ int cmp_ind(const void *a, const void *b)
 
 void two_opt(int *perm, int nc)
 {
-    int improved = 1;
-    int max_iter = 500, iter = 0;
+    int improved = 1, max_iter = 500, iter = 0;
     while (improved && iter++ < max_iter)
     {
         improved = 0;
@@ -187,13 +287,10 @@ void two_opt(int *perm, int nc)
                 int B = perm[i];
                 int C = perm[j];
                 int D = (j + 1 == nc) ? 0 : perm[j + 1];
-
                 double before = dist_mat[IDX(A, B)] + dist_mat[IDX(C, D)];
                 double after = dist_mat[IDX(A, C)] + dist_mat[IDX(B, D)];
-
                 if (after < before)
                 {
-                    // inversion le segment
                     for (int k = 0; k < (j - i + 1) / 2; k++)
                     {
                         int tmp = perm[i + k];
@@ -250,7 +347,6 @@ Individual run_ga()
     int *base = malloc(nc * sizeof(int));
     for (int i = 0; i < nc; i++)
         base[i] = i + 1;
-
     for (int i = 0; i < POP_SIZE; i++)
     {
         pop[i].perm = malloc(nc * sizeof(int));
@@ -263,16 +359,13 @@ Individual run_ga()
             pop[i].perm[k] = tmp;
         }
     }
-
     Individual best = {malloc(nc * sizeof(int)), INFINITY};
     int stagnant = 0;
-
     for (int gen = 0; gen < GENERATIONS; gen++)
     {
         for (int i = 0; i < POP_SIZE; i++)
             eval_ind(&pop[i]);
         qsort(pop, POP_SIZE, sizeof(Individual), cmp_ind);
-
         if (pop[0].fitness < best.fitness)
         {
             best.fitness = pop[0].fitness;
@@ -281,10 +374,8 @@ Individual run_ga()
         }
         else if (++stagnant > SKIP_NO_CHANGE)
             break;
-
         if (gen % 500 == 0)
             printf("Gen %d | Best: %.2f\n", gen, best.fitness);
-
         Individual *next = malloc(POP_SIZE * sizeof(Individual));
         int elite = POP_SIZE * ELITE_FRAC;
         for (int i = 0; i < elite; i++)
@@ -292,7 +383,6 @@ Individual run_ga()
             next[i].perm = malloc(nc * sizeof(int));
             memcpy(next[i].perm, pop[i].perm, nc * sizeof(int));
         }
-
         int idx = elite;
         while (idx < POP_SIZE)
         {
@@ -305,7 +395,6 @@ Individual run_ga()
                 a = b;
                 b = tmp;
             }
-
             int *child = malloc(nc * sizeof(int));
             for (int i = 0; i < nc; i++)
                 child[i] = -1;
@@ -332,16 +421,13 @@ Individual run_ga()
             if ((rand() / (double)RAND_MAX) < MUTATION_RATE)
                 advanced_mutation(child, nc);
             two_opt(child, nc);
-
             next[idx++].perm = child;
         }
-
         for (int i = 0; i < POP_SIZE; i++)
             free(pop[i].perm);
         free(pop);
         pop = next;
     }
-
     for (int i = 0; i < POP_SIZE; i++)
         free(pop[i].perm);
     free(pop);
@@ -349,9 +435,8 @@ Individual run_ga()
     return best;
 }
 
-
-
-void split_route(int *perm, int n)
+// SPLIT & PRINT OUTPUT
+void split_route(const int *perm, int n)
 {
     FILE *out = fopen("output.txt", "w");
     if (!out)
@@ -359,66 +444,44 @@ void split_route(int *perm, int n)
         perror("fopen(output.txt)");
         return;
     }
+    int max_segs = 100;
+    int *seg_lengths = malloc(max_segs * sizeof(int));
+    int **segments = malloc(max_segs * sizeof(int *));
+    int seg_count = split_and_optimize(perm, n, segments, seg_lengths, max_segs);
 
-    int i = 0, route_id = 1;
     double total_time_all = 0.0, total_dist_all = 0.0;
-
-    while (i < n)
+    for (int s = 0; s < seg_count; s++)
     {
-        double current_time = 0.0, current_dist = 0.0;
-        int start = i, prev = 0;
+        int seg_len = seg_lengths[s];
+        int *segment = segments[s];
 
-        while (i < n)
+        double real_time = compute_time(segment, seg_len);
+        double real_dist = 0.0;
+        int prev = 0;
+        for (int j = 0; j < seg_len; j++)
         {
-            int next = perm[i];
-            double to_next = time_mat[IDX(prev, next)];
-            double to_depot = time_mat[IDX(next, 0)];
-            double projected_time = current_time + to_next + 3.0 + to_depot;
-            if (projected_time > 180.0)
-                break;
-            current_time += to_next + 3.0;
-            current_dist += dist_mat[IDX(prev, next)];
-            prev = next;
-            i++;
-        }
-
-        int len = i - start;
-        int *segment = malloc(len * sizeof(int));
-        memcpy(segment, &perm[start], len * sizeof(int));
-
-        two_opt_strict(segment, len, 0);
-
-        // recalcul du cout apres optim
-        current_time = 0.0;
-        current_dist = 0.0;
-        prev = 0;
-        for (int j = 0; j < len; j++)
-        {
-            current_time += time_mat[IDX(prev, segment[j])] + 3.0;
-            current_dist += dist_mat[IDX(prev, segment[j])];
+            real_dist += dist_mat[IDX(prev, segment[j])];
             prev = segment[j];
         }
-        current_time += time_mat[IDX(prev, 0)];
-        current_dist += dist_mat[IDX(prev, 0)];
+        real_dist += dist_mat[IDX(prev, 0)];
 
-        total_time_all += current_time;
-        total_dist_all += current_dist;
+        total_time_all += real_time;
+        total_dist_all += real_dist;
 
-        // Affichage + output
-        fprintf(out, "%d: 0", route_id);
-        printf("Truck %d: 0", route_id);
-        for (int j = 0; j < len; j++)
+        fprintf(out, "%d: 0", s + 1);
+        printf("Truck %d: 0", s + 1);
+        for (int j = 0; j < seg_len; j++)
         {
             fprintf(out, " -> %d", segment[j]);
             printf(" -> %d", segment[j]);
         }
-        fprintf(out, " -> 0 | Distance: %.2f | Time: %.2f\n", current_dist, current_time);
-        printf(" -> 0\n    Time: %.2f min | Distance: %.2f km\n", current_time, current_dist);
-
-        route_id++;
+        fprintf(out, " -> 0 | Distance: %.2f | Time: %.2f\n", real_dist, real_time);
+        printf(" -> 0\n    Time: %.2f min | Distance: %.2f km\n", real_time, real_dist);
         free(segment);
     }
     printf("\nTOTAL: Time = %.2f min | Distance = %.2f km\n", total_time_all, total_dist_all);
+    free(segments);
+    free(seg_lengths);
     fclose(out);
 }
 
