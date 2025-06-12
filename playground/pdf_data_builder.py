@@ -1,3 +1,4 @@
+import subprocess
 import csv
 from datetime import datetime, timedelta
 import pprint
@@ -160,25 +161,28 @@ Compile et exécute un programme externe 'genetic' (via make), avec les paramèt
     - min_truck (int) : nombre minimum de camions.
     - max_truck (int) : nombre maximum de camions.
 """
-def execute(file_matrix_csv, *_): 
+def execute(file_matrix_csv, *_):
     try:
-        compile_result = subprocess.run(["make"], capture_output=True, text=True)
+        compile_result = subprocess.run(["make"])
         if compile_result.returncode != 0:
             print("Erreur de compilation :", compile_result.stderr)
             return "execute() error :" + compile_result.stderr
 
-        result = subprocess.run(["./genetic", file_matrix_csv], capture_output=True, text=True)
+        print("Lancement de ./genetic...")
+
+        # Don't capture output — let it print directly
+        result = subprocess.run(["./genetic", file_matrix_csv])
+        
         if result.returncode != 0:
-            print("Erreur d'exécution :", result.stderr)
-            return "execute() error : " + result.stderr
+            print("Erreur d'exécution")
+            return "execute() error"
 
         print("Exécution réussie du programme genetic")
-        return result.stdout
+        return None
 
     except Exception as e:
         print("Exception lors de l'exécution :", str(e))
         return "error : " + str(e)
-
 
 
 """
@@ -232,13 +236,16 @@ def create_route_map(routes_data, coords_csv_path, output_image_path):
         for camion_key, camion_data in routes_data.items():
             route = []
             trajet = camion_data['trajet']
-            
+
             if trajet:
                 first_etape = list(trajet.values())[0]
-                route.append(first_etape['pharmacie_depart_id'])
-                
+                # drill into nested structure
+                depart_id = first_etape['pharmacie_depart']['pharmacie_depart_id']
+                route.append(depart_id)
+
                 for etape_data in trajet.values():
-                    route.append(etape_data['pharmacie_arrivee_id'])
+                    arr_id = etape_data['pharmacie_arrivee']['pharmacie_arrivee_id']
+                    route.append(arr_id)
             
             if route:
                 routes.append(route)

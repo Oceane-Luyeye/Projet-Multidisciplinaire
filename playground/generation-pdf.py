@@ -5,15 +5,15 @@ import os
 
 def main():
     # Configuration
-    file_matrix_csv = "data/coordinates_10.csv"
-    coords_csv_path = "data/matrix_10.csv" 
+    file_matrix_csv = "data/matrix_10.csv" 
+    coords_csv_path = "data/coordinates_10.csv" 
     output_file = "output.txt"
   
     
     # Exécute l'algo
     print("Exécution de l'algorithme génétique...")
     execute(file_matrix_csv)
-    obj = generate_routes_from_file(file_matrix_csv, output_file)
+    obj = generate_routes_from_file(file_matrix_csv, coords_csv_path, output_file)
     
     if "error" in obj:
         print("Erreur dans la génération des routes:", obj)
@@ -64,14 +64,17 @@ def main():
         pdf.set_font("Arial", "", 11)
         for etape_key in sorted(infos['trajet'].keys(), key=lambda x: int(x.replace('etape', ''))):
             etape = infos['trajet'][etape_key]
-            dep = f"Pharmacie {etape['pharmacie_depart_id']}" if etape['pharmacie_depart_id'] != 0 else "Entrepôt"
-            arr = f"Pharmacie {etape['pharmacie_arrivee_id']}" if etape['pharmacie_arrivee_id'] != 0 else "Entrepôt"
-            h_dep = etape['heure_depart']
-            h_arr = etape['heure_arrivee']
+            # drill into nested dicts
+            dep_id  = etape['pharmacie_depart']['pharmacie_depart_id']
+            arr_id  = etape['pharmacie_arrivee']['pharmacie_arrivee_id']
+            dep     = f"Pharmacie {dep_id}" if dep_id  != 0 else "Entrepôt"
+            arr     = f"Pharmacie {arr_id}" if arr_id  != 0 else "Entrepôt"
+            h_dep   = etape['heure_depart']
+            h_arr   = etape['heure_arrivee']
             
-            if etape['pharmacie_depart_id'] == 0:
+            if dep_id  == 0:
                 obs = "Départ entrepôt"
-            elif etape['pharmacie_arrivee_id'] == 0:
+            elif arr_id  == 0:
                 obs = "Retour entrepôt"
             else:
                 obs = "Livraison"
