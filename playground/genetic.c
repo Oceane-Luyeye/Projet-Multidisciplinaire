@@ -5,13 +5,14 @@
 #include <time.h>
 #include <stdbool.h>
 
-#define POP_SIZE 300
+#define POP_SIZE 400
 #define GENERATIONS 10000
 #define MUTATION_RATE 0.1
 #define ELITE_FRAC 0.35
-#define SKIP_NO_CHANGE 2000
+#define SKIP_NO_CHANGE 1500
 #define IDX(i, j) ((i) * n_points + (j))
 #define TIME_LIMIT 180.0
+#define RUNS 3
 
 typedef struct
 {
@@ -374,8 +375,6 @@ Individual run_ga()
         }
         else if (++stagnant > SKIP_NO_CHANGE)
             break;
-        if (gen % 500 == 0)
-            printf("Gen %d | Best: %.2f\n", gen, best.fitness);
         Individual *next = malloc(POP_SIZE * sizeof(Individual));
         int elite = POP_SIZE * ELITE_FRAC;
         for (int i = 0; i < elite; i++)
@@ -469,17 +468,14 @@ void split_route(const int *perm, int n)
         total_dist_all += real_dist;
 
         fprintf(out, "%d: 0", s + 1);
-        printf("Truck %d: 0", s + 1);
         for (int j = 0; j < seg_len; j++)
         {
             fprintf(out, " -> %d", segment[j]);
-            printf(" -> %d", segment[j]);
         }
         fprintf(out, " -> 0 | Distance: %.2f | Time: %.2f\n", real_dist, real_time);
-        printf(" -> 0\n    Time: %.2f min | Distance: %.2f km\n", real_time, real_dist);
         free(segment);
     }
-    printf("\nTOTAL: Time = %.2f min | Distance = %.2f km\n", total_time_all, total_dist_all);
+    fprintf(out, "\nTotal_Distance = %.2f min | Total_Time = %.2f km\n", total_dist_all, total_time_all);
     free(segments);
     free(seg_lengths);
     fclose(out);
@@ -494,13 +490,32 @@ int main(int argc, char **argv)
     }
     srand(time(NULL));
     load_matrix(argv[1]);
-    Individual sol = run_ga();
-    printf("Best route: [0");
-    for (int i = 0; i < n_points - 1; i++)
-        printf(" -> %d", sol.perm[i]);
-    printf(" -> 0] | Distance = %.2f\n", sol.fitness);
-    split_route(sol.perm, n_points - 1);
-    free(sol.perm);
+
+    
+    Individual best_global;
+    best_global.perm = NULL;
+    best_global.fitness = INFINITY;
+
+    for (int r = 0; r < RUNS; r++)
+    {
+        Individual sol = run_ga();
+        if (sol.fitness < best_global.fitness)
+        {
+            if (best_global.perm != NULL)
+                free(best_global.perm);
+            best_global.perm = sol.perm;
+            best_global.fitness = sol.fitness;
+        }
+        else
+        {
+            free(sol.perm);
+        }
+    }
+
+    //SPLIT BEST ONE
+    split_route(best_global.perm, n_points - 1);
+
+    free(best_global.perm);
     free(dist_mat);
     free(time_mat);
     return 0;
