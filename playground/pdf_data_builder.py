@@ -2,21 +2,22 @@ import subprocess
 import csv
 from datetime import datetime, timedelta
 import pprint
-import subprocess
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import contextily as ctx
 import os
 import random  
-"""
-Lit un fichier CSV de matrice distance/temps et crée deux matrices (distances et durées)
-  Parameters:
-    - file_matrix_csv (str) : chemin vers le fichier CSV.
-  Returns:
-    - tuple (dist_matrice, dur_matrice) : matrices 2D
-"""
+
+
 def getMatrix(file_matrix_csv):
+    """
+    Lit un fichier CSV de matrice distance/temps et crée deux matrices (distances et durées)
+    Parameters:
+        - file_matrix_csv (str) : chemin vers le fichier CSV.
+    Returns:
+        - tuple (dist_matrice, dur_matrice) : matrices 2D
+    """
     max_id = 0
     data = []
 
@@ -52,25 +53,20 @@ def get_adresses_pharmacie(file_coordinate_csv):
  
     return adresses
 
-""" 
-Analyse un texte contenant des routes au format 'chemin: id1 -> id2 -> id3 | ...' et extrait la liste des itinéraires
-  Parameters:
-    - text (str) : texte à parser.
-  Returns
-    - list of list of int 
-  Exemple:
-    texte = 1: 0 -> 1 -> 12 -> 9 -> 3 -> 14 -> 0 | Distance: 98.80 | Time: 135.54
-            2: 0 -> 6 -> 13 -> 5 -> 10 -> 4 -> 0 | Distance: 88.19 | Time: 121.29
-            3: 0 -> 11 -> 2 -> 8 -> 7 -> 0 | Distance: 81.99 | Time: 120.77
 
-    retour : [[0, 1, 12, 9, 3, 14, 0],[0, 6, 13, 5, 10, 4, 0],[0, 11, 2, 8, 7, 0]]
-"""
 def parse_routes_from_text(text):
+    """ 
+    Analyse un texte contenant des routes au format 'chemin: id1 -> id2 -> id3 | ...' et extrait la liste des itinéraires
+    Parameters:
+        - text (str) : texte à parser.
+    Returns
+        - list of list of int 
+    """
     routes = []
     lines = text.strip().split('\n')
 
     for line in lines:
-        if line.strip():  # Éviter les lignes vides
+        if line.strip():
             chemin = line.split('|')[0]
             parts = chemin.split(':', 1)
             if len(parts) == 2:
@@ -79,15 +75,37 @@ def parse_routes_from_text(text):
                 routes.append(ids)
     return routes
 
-"""
-Construit un objet JSON détaillant les trajets, durées, distances et coûts à partir des routes et de la matrice
-  Parameters:
-    - file_matrix_csv (str) : chemin vers le fichier CSV de matrice
-    - tab (list of list of int) : routes extraites 
-  Returns:
-    - dict : objet avec informations sur chaque camion (trajet, durée, distance, coût carburant)
-"""
+
+def fusionne_trajet(trajets):
+    """
+    Prend une liste de trajets (chacun un chemin de 3h max), et regroupe deux trajets par camion.
+
+    Returns:
+        list of list of int: liste de trajets complets par camion
+    """
+    camions = []
+    i = 0
+    while i < len(trajets):
+        if i + 1 < len(trajets):
+            trajet_fusionne = trajets[i] + trajets[i + 1][1:]
+            camions.append(trajet_fusionne)
+            i += 2
+        else:
+            #cas où il y a un seul trajet
+            camions.append(trajets[i])
+            i += 1
+    return camions
+
+
 def createJsonObject(file_matrix_csv, file_coordinate_csv, tab):
+    """
+    Construit un objet JSON détaillant les trajets, durées, distances et coûts à partir des routes et de la matrice
+    Parameters:
+        - file_matrix_csv (str) : chemin vers le fichier CSV de matrice
+        - tab (list of list of int) : routes extraites 
+    Returns:
+        - dict : objet avec informations sur chaque camion (trajet, durée, distance, coût carburant)
+    """
     matrix_dist, matrix_time = getMatrix(file_matrix_csv)
     adresses = get_adresses_pharmacie(file_coordinate_csv)
     result = {}
@@ -112,7 +130,7 @@ def createJsonObject(file_matrix_csv, file_coordinate_csv, tab):
             duree = matrix_time[depart][arrivee]
             distance = matrix_dist[depart][arrivee]
 
-            # Temps d'arrêt de 3 minutes pour les livraisons (sauf premier trajet)
+            #temsp d'arret
             if j > 0:
                 current_time += timedelta(minutes=3)
 
@@ -154,14 +172,13 @@ def createJsonObject(file_matrix_csv, file_coordinate_csv, tab):
         }
     return result
 
-"""
-Compile et exécute un programme externe 'genetic' (via make), avec les paramètres donnés.
-  Parameters:
-    - file_matrix_csv (str) : chemin fichier matrice.
-    - min_truck (int) : nombre minimum de camions.
-    - max_truck (int) : nombre maximum de camions.
-"""
+
 def execute(file_matrix_csv, *_):
+    """
+    Compile et exécute un programme externe 'genetic' (via make), avec les paramètres donnés.
+    Parameters:
+        - file_matrix_csv (str) : chemin fichier matrice.
+    """
     try:
         compile_result = subprocess.run(["make"])
         if compile_result.returncode != 0:
@@ -170,7 +187,6 @@ def execute(file_matrix_csv, *_):
 
         print("Lancement de ./genetic...")
 
-        # Don't capture output — let it print directly
         result = subprocess.run(["./genetic", file_matrix_csv])
         
         if result.returncode != 0:
@@ -185,17 +201,18 @@ def execute(file_matrix_csv, *_):
         return "error : " + str(e)
 
 
-"""
-Lit le fichier output_file, parse les routes, et crée un objet JSON des trajets.
-    Parameters
-        file_matrix_csv (str): chemin vers la matrice CSV.
-        output_file (str): fichier texte avec les routes générées.
-    Returns:
-        dict: données des trajets ou dict d'erreur si problème.
-    Note:
-        Ne lance pas l'exécution du programme externe, output_file doit exister.
-"""
+
 def generate_routes_from_file(file_matrix_csv, file_coordinate_csv, output_file): 
+    """
+    Lit le fichier output_file, parse les routes, et crée un objet JSON des trajets.
+        Parameters
+            file_matrix_csv (str): chemin vers la matrice CSV.
+            output_file (str): fichier texte avec les routes générées.
+        Returns:
+            dict: données des trajets ou dict d'erreur si problème.
+        Note:
+            Ne lance pas l'exécution du programme externe, output_file doit exister.
+    """
     try:
         with open(output_file, 'r', encoding='utf-8') as f:
             text = f.read()
@@ -206,8 +223,11 @@ def generate_routes_from_file(file_matrix_csv, file_coordinate_csv, output_file)
         
         tab = parse_routes_from_text(text)
         print("Routes parsées :", tab)
-        
-        result = createJsonObject(file_matrix_csv, file_coordinate_csv, tab)
+
+        tab_fusion = fusionne_trajet(tab)
+
+        result = createJsonObject(file_matrix_csv, file_coordinate_csv, tab_fusion)
+
         print("Objet JSON créé :")
         pprint.pprint(result)
         
