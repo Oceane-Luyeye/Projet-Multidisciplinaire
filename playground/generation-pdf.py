@@ -65,16 +65,17 @@ def main():
         for etape_key in sorted(infos['trajet'].keys(), key=lambda x: int(x.replace('etape', ''))):
             etape = infos['trajet'][etape_key]
             # drill into nested dicts
-            dep_id  = etape['pharmacie_depart']['pharmacie_depart_id']
-            arr_id  = etape['pharmacie_arrivee']['pharmacie_arrivee_id']
-            dep     = f"Pharmacie {dep_id}" if dep_id  != 0 else "Entrepôt"
-            arr     = f"Pharmacie {arr_id}" if arr_id  != 0 else "Entrepôt"
-            h_dep   = etape['heure_depart']
-            h_arr   = etape['heure_arrivee']
-            
-            if dep_id  == 0:
+            dep_id = etape['pharmacie_depart']['pharmacie_depart_id']
+            arr_id = etape['pharmacie_arrivee']['pharmacie_arrivee_id']
+
+            dep = etape['pharmacie_depart']['nom_pharmacie'] if dep_id != 0 else "Entrepôt"
+            arr = etape['pharmacie_arrivee']['nom_pharmacie'] if arr_id != 0 else "Entrepôt"
+            h_dep = etape['heure_depart']
+            h_arr = etape['heure_arrivee']
+
+            if dep_id == 0:
                 obs = "Départ entrepôt"
-            elif arr_id  == 0:
+            elif arr_id == 0:
                 obs = "Retour entrepôt"
             else:
                 obs = "Livraison"
