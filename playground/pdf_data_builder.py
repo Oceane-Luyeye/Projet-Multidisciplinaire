@@ -55,65 +55,91 @@ def get_adresses_pharmacie(file_coordinate_csv):
 
 
 def parse_routes_from_text(text):
-    """ 
-    Analyse un texte contenant des routes au format 'chemin: id1 -> id2 -> id3 | ...' et extrait la liste des itinéraires
-    Parameters:
-        - text (str) : texte à parser.
-    Returns
-        - list of list of int 
+    """
+    Analyse un texte contenant des routes au format :
+    '1: 0 -> 7 -> 2 -> 3 -> 9 -> 10 -> 1 -> 8 -> 0 | Distance: 112.99 | Time: 174.63'
+    Retourne une liste de dicts : {route, distance, time}
     """
     routes = []
     lines = text.strip().split('\n')
 
     for line in lines:
-        if line.strip():
-            chemin = line.split('|')[0]
-            parts = chemin.split(':', 1)
-            if len(parts) == 2:
-                _, route_str = parts
-                ids = [int(x.strip()) for x in route_str.strip().split('->')]
-                routes.append(ids)
+        if not line.strip():
+            continue
+
+        try:
+            chemin_part, *infos = line.split('|')
+            route_str = chemin_part.split(':', 1)[1].strip()
+            route_ids = [int(x.strip()) for x in route_str.split('->')]
+
+            distance = float([x for x in infos if 'Distance' in x][0].split(':')[1])
+            time = float([x for x in infos if 'Time' in x][0].split(':')[1])
+
+            routes.append({
+                "route": route_ids,
+                "distance": distance,
+                "time": time
+            })
+        except Exception as e:
+            print(f"Erreur de parsing sur la ligne : {line} — {e}")
+            continue
+
     return routes
 
 
 def fusionne_trajet(trajets):
     """
-    Prend une liste de trajets (chacun un chemin de 3h max), et regroupe deux trajets par camion.
+    Prend une liste de trajets avec 'route', 'distance', 'time' et les regroupe 2 par 2.
+    Fusionne les chemins (en évitant la redondance du point de jonction), et additionne les distances et durées.
+
+    Parameters:
+        - trajets (list of dict): chaque dict contient une route, distance et temps.
 
     Returns:
-        list of list of int: liste de trajets complets par camion
+        - list of dict: trajets fusionnés
     """
     camions = []
     i = 0
     while i < len(trajets):
         if i + 1 < len(trajets):
-            trajet_fusionne = trajets[i] + trajets[i + 1][1:]
-            camions.append(trajet_fusionne)
+            t1 = trajets[i]
+            t2 = trajets[i + 1]
+            route_fusionnee = t1["route"] + t2["route"][1:]
+            distance_totale = t1["distance"] + t2["distance"]
+            time_total = t1["time"] + t2["time"]
+
+            camions.append({
+                "route": route_fusionnee,
+                "distance": distance_totale,
+                "time": time_total
+            })
             i += 2
         else:
-            #cas où il y a un seul trajet
             camions.append(trajets[i])
             i += 1
     return camions
 
 
+
 def createJsonObject(file_matrix_csv, file_coordinate_csv, tab):
     """
-    Construit un objet JSON détaillant les trajets, durées, distances et coûts à partir des routes et de la matrice
+    Construit un objet JSON détaillant les trajets, durées, distances et coûts à partir des routes et de la matrice.
+    
     Parameters:
-        - file_matrix_csv (str) : chemin vers le fichier CSV de matrice
-        - tab (list of list of int) : routes extraites 
+        - file_matrix_csv (str): chemin vers le fichier CSV de matrice
+        - file_coordinate_csv (str): chemin vers le fichier CSV des coordonnées
+        - tab (list of dict): chaque dict contient une 'route' (list[int])
+    
     Returns:
-        - dict : objet avec informations sur chaque camion (trajet, durée, distance, coût carburant)
+        - dict: objet avec informations sur chaque camion
     """
     matrix_dist, matrix_time = getMatrix(file_matrix_csv)
     adresses = get_adresses_pharmacie(file_coordinate_csv)
     result = {}
 
-    for i, item in enumerate(tab):
-        in_matin = 1
-        in_aprem = 0
-        
+    for i, trajet_data in enumerate(tab):
+        route = trajet_data["route"]
+
         trajet_dict = {}
         distance_totale = 0
         duree_totale = 0
@@ -123,29 +149,29 @@ def createJsonObject(file_matrix_csv, file_coordinate_csv, tab):
         debut_aprem = datetime.strptime("15:00", "%H:%M")
 
         duree_tournee = 0
+        in_matin = 1
 
-        for j in range(len(item) - 1):
-            depart = item[j]
-            arrivee = item[j + 1]
+        for j in range(len(route) - 1):
+            depart = route[j]
+            arrivee = route[j + 1]
             duree = matrix_time[depart][arrivee]
             distance = matrix_dist[depart][arrivee]
 
-            #temsp d'arret
+            # +3 mintues
             if j > 0:
                 current_time += timedelta(minutes=3)
 
-            # Gestion de la pause déjeuner
+            #pause dej
             if (in_matin and (current_time + timedelta(minutes=duree) > fin_matin or duree_tournee + duree > 180)):
                 current_time = debut_aprem
                 duree_tournee = 0
                 in_matin = 0
-                in_aprem = 1
 
             heure_depart = current_time
             heure_arrivee = heure_depart + timedelta(minutes=duree)
 
             etape = {
-                "pharmacie_depart":{
+                "pharmacie_depart": {
                     "pharmacie_depart_id": depart,
                     "nom_pharmacie": adresses[depart]
                 },
@@ -165,12 +191,15 @@ def createJsonObject(file_matrix_csv, file_coordinate_csv, tab):
 
         result[f'camion{i + 1}'] = {
             'trajet': trajet_dict,
-            'duree_totale_min': round(duree_totale, 2),
-            'distance_total_km': round(distance_totale, 2),
+            'duree_totale_min': trajet_data['time'],
+            'distance_total_km': trajet_data['distance'],
             'cout_carburant_eur': round(((distance_totale * 8.5) / 100) * 1.72, 2),
             'total_carburant_litre': round((distance_totale * 8.5) / 100, 2)
         }
+
     return result
+
+
 
 
 def execute(file_matrix_csv, *_):
@@ -234,7 +263,6 @@ def generate_routes_from_file(file_matrix_csv, file_coordinate_csv, output_file)
         return result
         
     except Exception as e:
-        print("Erreur dans generate_routes_from_file :", str(e))
         return {"error": "generate_routes_from_file() error : " + str(e)}
 
 
