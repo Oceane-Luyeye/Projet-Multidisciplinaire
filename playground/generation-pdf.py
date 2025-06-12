@@ -5,8 +5,8 @@ import os
 
 def main():
     # Configuration
-    file_matrix_csv = "./data/livraison50_matrix.csv"
-    coords_csv_path = "./data/livraison50_coordinates.csv" 
+    file_matrix_csv = "data/coordinates_10.csv"
+    coords_csv_path = "data/matrix_10.csv" 
     output_file = "output.txt"
   
     

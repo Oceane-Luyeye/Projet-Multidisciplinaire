@@ -7,7 +7,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import contextily as ctx
 import os
-
+import random  
 """
 Lit un fichier CSV de matrice distance/temps et crée deux matrices (distances et durées)
   Parameters:
@@ -213,12 +213,9 @@ def generate_routes_from_file(file_matrix_csv, file_coordinate_csv, output_file)
         print("Erreur dans generate_routes_from_file :", str(e))
         return {"error": "generate_routes_from_file() error : " + str(e)}
 
-<<<<<<< HEAD
 
-import random  # Ajoute ceci en haut avec les imports existants
 
-=======
->>>>>>> 8a2b54770634e6a0fd752908e3a31ea83934bfe9
+
 def create_route_map(routes_data, coords_csv_path, output_image_path):
     """
     Crée une carte des trajets et la sauvegarde en image
