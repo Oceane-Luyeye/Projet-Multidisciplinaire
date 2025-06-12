@@ -50,41 +50,49 @@ def draw_table(pdf, etapes, title, headers, col_widths, row_line_height):
 
     pdf.ln(4)
 
+def draw_map(pdf, temp_map_path): 
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 20)
+    pdf.cell(0, 0, safe_text("CARTE GÉNÉRALE DES TOURNÉES"), ln=True, align='C')
+    pdf.ln(30)
+
+    page_width = pdf.w - 50 
+    page_height = pdf.h - 80
+
+    x_centered = (pdf.w - page_width) / 2 
+    pdf.image(temp_map_path, x=x_centered, y=pdf.get_y(), w=page_width, h=page_height - 10)
+    pdf.ln(page_height - 10)
+
 
 def main():
-    # Configuration
+    #configuration
     file_matrix_csv = "data/matrix_85.csv" 
     coords_csv_path = "data/coordinates_85.csv" 
     output_file = "output.txt"
+    
   
-    # Exécute l'algorithme génétique
-    print("Exécution de l'algorithme génétique...")
+    #execution algo genetique
     execute(file_matrix_csv)
-    obj = generate_routes_from_file(file_matrix_csv, coords_csv_path, output_file)
+    obj, totaux = generate_routes_from_file(file_matrix_csv, coords_csv_path, output_file)
     
     if "error" in obj:
         print("Erreur dans la génération des routes:", obj)
         return
     
-    # Créer la carte
-    print("Génération de la carte...")
-    temp_map_path = "temp_route_map.png"
-    map_created = create_route_map(obj, coords_csv_path, temp_map_path)
-    
-    # Création du PDF
-    print("Création du PDF...")
+    #creation pdf
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     
+    #creation de la carte
+    temp_map_path = "temp_route_map.png"
+    map_created = create_route_map(obj, coords_csv_path, temp_map_path)
+    
     if map_created and os.path.exists(temp_map_path):
-        pdf.add_page()
-        pdf.set_font("Arial", "B", 20)
-        pdf.cell(0, 0, safe_text("CARTE GÉNÉRALE DES TOURNÉES"), ln=True, align='C')
-        pdf.ln(30)
+        draw_map(pdf, temp_map_path)
 
-        page_width = pdf.w - 20
-        page_height = pdf.h - 60
-        pdf.image(temp_map_path, w=page_width, h=page_height - 10)
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 10, safe_text(f"Distance totale (toutes tournées) : {totaux.get('distance_totale', 0):.2f} km"), ln=True, align='L')
+        pdf.cell(0, 10, safe_text(f"Durée totale estimée : {totaux.get('temps_total', 0):.2f} minutes"), ln=True, align='L')
 
     for camion, infos in obj.items():
         pdf.add_page()

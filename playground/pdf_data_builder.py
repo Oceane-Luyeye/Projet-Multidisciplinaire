@@ -56,15 +56,37 @@ def get_adresses_pharmacie(file_coordinate_csv):
 
 def parse_routes_from_text(text):
     """
-    Analyse un texte contenant des routes au format :
-    '1: 0 -> 7 -> 2 -> 3 -> 9 -> 10 -> 1 -> 8 -> 0 | Distance: 112.99 | Time: 174.63'
-    Retourne une liste de dicts : {route, distance, time}
+    Analyse un texte contenant des routes et une ligne de résumé :
+    - Ligne de route : '1: 0 -> 7 -> 2 -> 3 -> 9 -> 10 -> 1 -> 8 -> 0 | Distance: 112.99 | Time: 174.63'
+    - Ligne de total : 'Total_Distance = 640.75 min | Total_Time = 1100.43 km'
+
+    Retourne une tuple :
+    - routes : liste de dicts {route, distance, time}
+    - totaux : dict {distance_totale, temps_total}
     """
     routes = []
+    totaux = {}
+
     lines = text.strip().split('\n')
 
     for line in lines:
         if not line.strip():
+            continue
+
+        if line.startswith("Total_Distance"):
+            try:
+                parts = line.split('|')
+                dist_part = parts[0].split('=')[1].strip().split()[0]
+                time_part = parts[1].split('=')[1].strip().split()[0]
+                totaux = {
+                    "distance_totale": float(dist_part),
+                    "temps_total": float(time_part)
+                }
+            except Exception as e:
+                print(f"Erreur lors du parsing des totaux : {line} — {e}")
+            continue
+
+        if ':' not in line.split('|')[0]:
             continue
 
         try:
@@ -84,7 +106,7 @@ def parse_routes_from_text(text):
             print(f"Erreur de parsing sur la ligne : {line} — {e}")
             continue
 
-    return routes
+    return routes, totaux
 
 
 def fusionne_trajet(trajets):
@@ -121,7 +143,7 @@ def fusionne_trajet(trajets):
 
 
 
-def createJsonObject(file_matrix_csv, file_coordinate_csv, tab):
+def createJsonObject(file_matrix_csv, file_coordinate_csv, tab, totaux):
     """
     Construit un objet JSON détaillant les trajets, durées, distances et coûts à partir des routes et de la matrice.
     
@@ -197,7 +219,7 @@ def createJsonObject(file_matrix_csv, file_coordinate_csv, tab):
             'total_carburant_litre': round((float(trajet_data['distance']) * 8.5) / 100, 2)
         }
 
-    return result
+    return result, totaux
 
 
 
@@ -214,15 +236,12 @@ def execute(file_matrix_csv, *_):
             print("Erreur de compilation :", compile_result.stderr)
             return "execute() error :" + compile_result.stderr
 
-        print("Lancement de ./genetic...")
-
         result = subprocess.run(["./genetic", file_matrix_csv])
         
         if result.returncode != 0:
             print("Erreur d'exécution")
             return "execute() error"
 
-        print("Exécution réussie du programme genetic")
         return None
 
     except Exception as e:
@@ -246,19 +265,11 @@ def generate_routes_from_file(file_matrix_csv, file_coordinate_csv, output_file)
         with open(output_file, 'r', encoding='utf-8') as f:
             text = f.read()
         
-        print("Contenu du fichier output.txt :")
-        print(text)
-        print("=" * 50)
-        
-        tab = parse_routes_from_text(text)
-        print("Routes parsées :", tab)
+        tab, totaux = parse_routes_from_text(text)
 
         tab_fusion = fusionne_trajet(tab)
 
-        result = createJsonObject(file_matrix_csv, file_coordinate_csv, tab_fusion)
-
-        print("Objet JSON créé :")
-        pprint.pprint(result)
+        result = createJsonObject(file_matrix_csv, file_coordinate_csv, tab_fusion, totaux)
         
         return result
         
