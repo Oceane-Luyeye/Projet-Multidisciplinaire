@@ -1,7 +1,6 @@
 import argparse
 import os
 from fpdf import FPDF
-from fpdf.enums import XPos, YPos
 
 import pdf_data_builder
 from pdf_data_builder import (
