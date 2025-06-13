@@ -1,3 +1,5 @@
+# ATTENTION : use python 3.9
+
 Steps : 
 
 chmod +x setup.sh  
