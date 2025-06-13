@@ -1,1 +1,3 @@
-/RENDU/venv
+/venv
+*.o
+genetic

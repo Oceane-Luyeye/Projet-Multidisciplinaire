@@ -6,8 +6,8 @@
       "type": "lldb",
       "request": "launch",
       "args": [],
-      "cwd": "/Users/anaisaoucher/Desktop/ESIEE/Projet-Multidisciplinaire/playground",
-      "program": "/Users/anaisaoucher/Desktop/ESIEE/Projet-Multidisciplinaire/playground/build/Debug/outDebug"
+      "cwd": "/Users/ayoub/Documents/GitHub/Projet-Multidisciplinaire/RENDU",
+      "program": "/Users/ayoub/Documents/GitHub/Projet-Multidisciplinaire/RENDU/build/Debug/outDebug"
     }
   ]
 }

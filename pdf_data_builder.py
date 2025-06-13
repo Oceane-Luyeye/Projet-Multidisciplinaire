@@ -41,12 +41,11 @@ def get_adresses_pharmacie(file_coordinate_csv):
 
 def execute(file_matrix_csv, *_):
     try:
-        compile_result = subprocess.run(["make"])
-        if compile_result.returncode != 0:
-            print("Erreur de compilation :", compile_result.stderr)
-            return "execute() error :" + compile_result.stderr
-        print("Lancement de ./genetic...")
-        result = subprocess.run(["./genetic", file_matrix_csv])
+        subprocess.run(["make", "clean"], check=True)
+        print("Compiling genetic.c on this machine…")
+        subprocess.run(["make"], check=True)
+        print("Lancement de ./genetic…")
+        result = subprocess.run(["./genetic", file_matrix_csv], check=False)
         if result.returncode != 0:
             print("Erreur d'exécution")
             return "execute() error"
